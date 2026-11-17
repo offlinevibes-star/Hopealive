@@ -1,0 +1,92 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin | HopeAlive Foundation</title><link rel="stylesheet" href="style.css">
+<style>
+body{background:var(--mist)}
+.ad{max-width:1000px;margin:auto;padding:22px}
+h2{font-size:26px;max-width:none}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:18px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+.b,.tabs button{font:inherit;font-weight:700;font-size:15px;border:2px solid var(--ink);border-radius:99px;padding:8px 18px;background:#fff;color:var(--ink);cursor:pointer;text-decoration:none;display:inline-block}
+.tabs button[aria-pressed=true]{background:var(--ink);color:#fff}
+.b.s{background:var(--sun)}
+.b.d{border-color:var(--coral);color:#c0392b}
+.pn2{background:#fff;border:2px solid var(--ink);border-radius:20px;padding:22px;margin-bottom:18px}
+.f{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.li{display:flex;gap:12px;justify-content:space-between;align-items:center;padding:12px 0;border-top:2px solid var(--mist)}
+.li input{margin:0}
+.th2{width:64px;height:64px;object-fit:cover;border-radius:10px;flex:none}
+.tb{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.tb .b{padding:4px 14px}
+#ed{min-height:320px;border:2px solid var(--ink);border-radius:12px;padding:14px;background:#fff;outline:0;font-size:18px;line-height:1.7}
+#ed img{max-width:100%;border-radius:12px}
+#ed h2{font-size:30px;margin-top:20px}
+#ed h3{font-size:22px}
+#ed blockquote{border-left:6px solid var(--sun);padding-left:16px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:12px 22px;border-radius:99px;font-weight:700;z-index:99;display:none;max-width:90%}
+</style></head><body><div id="app"></div><div id="toast" role="status"></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const IMG=u=>{const m=/drive\.google\.com\/.*?(?:\/d\/|[?&]id=)([\w-]+)/.exec(u||'');return m?'https://lh3.googleusercontent.com/d/'+m[1]+'=w600':u};
+const PV={},pv=u=>PV[u]||IMG(u);
+const enc=s=>btoa(unescape(encodeURIComponent(s))),dec=b=>decodeURIComponent(escape(atob(b.replace(/\s/g,''))));
+const slug=s=>s.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const toast=m=>{const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t.h);t.h=setTimeout(()=>t.style.display='none',4500)};
+let S=JSON.parse(localStorage.gh||sessionStorage.gh||'null'),D={posts:[],set:{}},T='posts',E=null,rg=null;
+const api=async(p,o)=>{const r=await fetch('https://api.github.com/repos/'+S.repo+p,{...o,headers:{Authorization:'Bearer '+S.token,Accept:'application/vnd.github+json'}});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.message||r.status);return j};
+const get=async f=>{try{const r=await api('/contents/'+f+'?ref='+S.branch);return{d:JSON.parse(dec(r.content)),sha:r.sha}}catch(e){if(e.message=='Not Found')return{d:null};throw e}};
+const put=(f,c,m,sha)=>api('/contents/'+f,{method:'PUT',body:JSON.stringify({message:m,content:c,branch:S.branch,sha})});
+const upd=async(f,fn,m)=>{const r=await get(f),n=fn(r.d);await put(f,enc(JSON.stringify(n,null,1)),m,r.sha);return n};
+const up=async f=>{toast('Uploading photo…');const b=await createImageBitmap(f),k=Math.min(1,1600/Math.max(b.width,b.height)),c=document.createElement('canvas');c.width=Math.round(b.width*k);c.height=Math.round(b.height*k);const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(b,0,0,c.width,c.height);const u=c.toDataURL('image/jpeg',.82),p='images/'+Date.now()+'-'+(slug(f.name.replace(/\.[^.]+$/,'')).slice(0,30)||'photo')+'.jpg';await put(p,u.split(',')[1],'Upload '+p);PV[p]=u;toast('Photo uploaded');return{p,u}};
+const FS=[['Contact',[['email','Email'],['phone','Phone (optional)'],['whatsapp','WhatsApp number, digits only, e.g. 2348012345678']]],['Social links',[['social.Facebook','Facebook page link'],['social.Instagram','Instagram link'],['social.X','X (Twitter) link'],['social.LinkedIn','LinkedIn link'],['social.YouTube','YouTube link']]],['Donations',[['donateLink','Online donation link (Paystack, Flutterwave...)'],['bank.bank','Bank name'],['bank.name','Account name'],['bank.number','Account number']]],['Forms and comments',[['formspree','Formspree form link (contact form)'],['giscus.repo','Giscus repository (owner/name)'],['giscus.repoId','Giscus repo ID'],['giscus.category','Giscus category'],['giscus.categoryId','Giscus category ID']]]];
+const gv=(o,k)=>k.split('.').reduce((a,b)=>a&&a[b],o)||'';
+const vPosts=()=>`<div class="pn2"><button class="b s" data-a="new">+ New post</button></div><div class="pn2">${D.posts.slice().sort((a,b)=>b.date.localeCompare(a.date)).map(p=>`<div class="li"><span><b>${esc(p.title)}</b><br><small>${p.draft?'Draft':'Published'}, ${esc(p.date)}, ${esc(p.cat)}</small></span><button class="b" data-a="edit" data-s="${esc(p.slug)}">Edit</button></div>`).join('')||'<p>No posts yet. Write your first one.</p>'}</div>`;
+const vEdit=()=>`<div class="pn2"><h2>${E._new?'New post':'Edit post'}</h2><div class="f"><label>Title<input id="t" value="${esc(E.title)}"></label><label>URL slug<input id="sl" value="${esc(E.slug)}"></label><label>Date<input id="dt" type="date" value="${esc(E.date)}"></label><label>Category<input id="ct" list="cl" value="${esc(E.cat)}"></label><datalist id="cl">${[...new Set(D.posts.map(p=>p.cat))].map(c=>`<option value="${esc(c)}">`).join('')}</datalist><label>Tags (comma separated)<input id="tg" value="${esc((E.tags||[]).join(', '))}"></label><label>Author<input id="au" value="${esc(E.author)}"></label></div><label style="display:block;margin-top:14px">Excerpt (shown in post lists)<textarea id="ex" rows="2">${esc(E.excerpt)}</textarea></label><p style="margin-top:14px"><b>Featured image</b></p><div class="li"><img id="fi" class="th2" src="${E.img?esc(pv(E.img)):''}" ${E.img?'':'hidden'} alt=""><span style="flex:1"><input type="file" accept="image/*" data-a="fimg"><small>Or paste an image link:</small><input id="fu" value="${esc(E.img)}"></span></div><p style="margin-top:14px"><b>Content</b></p><div class="tb">${[['bold','B'],['italic','I'],['formatBlock:h2','Heading'],['formatBlock:h3','Subheading'],['formatBlock:blockquote','Quote'],['insertUnorderedList','List'],['createLink','Link'],['removeFormat','Clear']].map(([c,l])=>`<button type="button" class="b" data-a="cmd" data-c="${c}">${l}</button>`).join('')}<label class="b">Image<input type="file" accept="image/*" data-a="bimg" hidden></label></div><div id="ed" contenteditable="true">${E.body}</div><label style="display:flex;gap:8px;align-items:center;margin-top:14px"><input type="checkbox" id="dr" style="width:auto;margin:0" ${E.draft?'checked':''}> Save as draft (hidden from the public site)</label><p style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap"><button class="b s" data-a="savepost">Publish</button><button class="b" data-a="cancel">Cancel</button>${E._new?'':'<button class="b d" data-a="delpost">Delete</button>'}</p></div>`;
+const vSet=()=>{const Z=D.set;return `<div class="pn2"><h2>Home page</h2><div class="li"><img class="th2" src="${Z.hero?esc(pv(Z.hero)):''}" ${Z.hero?'':'hidden'} alt=""><span style="flex:1"><b>Hero photo</b><input type="file" accept="image/*" data-a="hero"></span><button class="b d" data-a="nohero">Remove</button></div><h3 style="margin:18px 0 6px">Impact numbers (real figures only)</h3><div id="st">${Z.stats.map(s=>`<div class="li"><input placeholder="250" value="${esc(s.n)}"><input placeholder="children supported" value="${esc(s.l)}"><button class="b d" data-a="rmrow">Remove</button></div>`).join('')}</div><p style="margin-top:12px"><button class="b" data-a="addst">+ Add number</button></p></div>${FS.map(([h,l])=>`<div class="pn2"><h2>${h}</h2><div class="f">${l.map(([k,t])=>`<label>${t}<input data-k="${k}" value="${esc(gv(Z,k))}"></label>`).join('')}</div></div>`).join('')}<p style="font-size:14px;margin-bottom:14px">Comments use Giscus: enable Discussions on your repo and get the values at giscus.app.</p><button class="b s" data-a="saveset">Save settings</button>`};
+const vGal=()=>`<div class="pn2"><p><b>Add photos</b> (you can pick several)</p><input type="file" accept="image/*" multiple data-a="gal"></div><div class="pn2">${D.set.gallery.map((g,i)=>`<div class="li"><img class="th2" src="${esc(pv(g.src))}" alt=""><input class="cap" data-i="${i}" placeholder="Caption" value="${esc(g.cap)}"><span><button class="b" data-a="mvg" data-i="${i}">Up</button> <button class="b d" data-a="rmg" data-i="${i}">Remove</button></span></div>`).join('')||'<p>No photos yet.</p>'}</div><button class="b s" data-a="savegal">Save captions</button>`;
+const vTeam=()=>`<div class="pn2">${D.set.team.map((m,i)=>`<div class="li" style="align-items:flex-start"><div style="flex:1" class="f"><label>Name<input data-f="n" data-i="${i}" value="${esc(m.n)}"></label><label>Role<input data-f="r" data-i="${i}" value="${esc(m.r)}"></label><label>Short bio<input data-f="b" data-i="${i}" value="${esc(m.b)}"></label><label>Photo<input type="file" accept="image/*" data-a="tp" data-i="${i}"></label></div>${m.p?`<img class="th2" src="${esc(pv(m.p))}" alt="">`:''}<button class="b d" data-a="rmt" data-i="${i}">Remove</button></div>`).join('')}<p style="margin-top:14px"><button class="b" data-a="addt">+ Add member</button></p></div><button class="b s" data-a="savet">Save team</button>`;
+const R=()=>{$('#app').innerHTML=`<div class="ad"><div class="bar"><b style="font-size:24px">HopeAlive Admin</b><span><a class="b" href="index.html" target="_blank">View site</a> <button class="b" data-a="out">Sign out</button></span></div>${E?vEdit():`<div class="tabs">${['posts','settings','gallery','team'].map(t=>`<button data-a="tab" data-t="${t}" aria-pressed="${T==t}">${t[0].toUpperCase()+t.slice(1)}</button>`).join('')}</div>${({posts:vPosts,settings:vSet,gallery:vGal,team:vTeam})[T]()}`}</div>`;if(E)document.execCommand('defaultParagraphSeparator',false,'p')};
+const grab=()=>{const Z=D.set;document.querySelectorAll('[data-k]').forEach(x=>{const k=x.dataset.k.split('.');let o=Z;k.slice(0,-1).forEach(j=>o=o[j]=o[j]||{});o[k.pop()]=x.value.trim()});
+ if($('#st'))Z.stats=[...document.querySelectorAll('#st .li')].map(x=>({n:x.children[0].value.trim(),l:x.children[1].value.trim()})).filter(s=>s.n||s.l);
+ document.querySelectorAll('.cap').forEach(x=>Z.gallery[+x.dataset.i].cap=x.value.trim());
+ document.querySelectorAll('[data-f]').forEach(x=>Z.team[+x.dataset.i][x.dataset.f]=x.value.trim())};
+const saveSet=async m=>{grab();await upd('data/settings.json',()=>D.set,m||'Update site settings');toast('Saved. Your site updates in about a minute.')};
+const savePost=async()=>{const c=$('#ed').cloneNode(true);c.querySelectorAll('img[data-src]').forEach(i=>{i.setAttribute('src',i.dataset.src);i.removeAttribute('data-src')});
+ const p={title:$('#t').value.trim(),slug:slug($('#sl').value||$('#t').value),date:$('#dt').value,cat:$('#ct').value.trim()||'General',tags:$('#tg').value.split(',').map(s=>s.trim()).filter(Boolean),author:$('#au').value.trim(),excerpt:$('#ex').value.trim(),img:$('#fu').value.trim(),body:c.innerHTML,draft:$('#dr').checked};
+ if(!p.title||!p.slug||!p.date)return toast('Please add a title and a date');
+ if(!p.excerpt)p.excerpt=c.textContent.trim().slice(0,160);
+ D.posts=await upd('data/posts.json',ps=>{ps=(ps||[]).filter(x=>x.slug!=E._o);if(ps.some(x=>x.slug==p.slug))throw new Error('That URL slug is already used');return ps.concat(p)},(E._new?'New post: ':'Update post: ')+p.title);
+ E=null;R();toast(p.draft?'Draft saved.':'Published. Your site updates in about a minute.')};
+const run=async(a,el)=>{const Z=D.set,i=+el.dataset.i;try{
+ if(a=='tab'){grab();T=el.dataset.t;R()}
+ else if(a=='out'){delete localStorage.gh;delete sessionStorage.gh;S=null;login()}
+ else if(a=='new'){E={_new:1,title:'',slug:'',date:new Date().toISOString().slice(0,10),cat:'News',tags:[],author:'HopeAlive Foundation',excerpt:'',img:'',body:'<p><br></p>',draft:false};R()}
+ else if(a=='edit'){E={...D.posts.find(p=>p.slug==el.dataset.s)};E._o=E.slug;R()}
+ else if(a=='cancel'){E=null;R()}
+ else if(a=='cmd'){const[c,v]=el.dataset.c.split(':');$('#ed').focus();if(c=='createLink'){const u=prompt('Link address (https://...)');if(u)document.execCommand(c,false,u)}else document.execCommand(c,false,v?'<'+v+'>':null)}
+ else if(a=='savepost')await savePost();
+ else if(a=='delpost'){if(confirm('Delete this post permanently?')){D.posts=await upd('data/posts.json',ps=>(ps||[]).filter(p=>p.slug!=E._o),'Delete post: '+E.title);E=null;R();toast('Deleted. Your site updates in about a minute.')}}
+ else if(a=='fimg'){const r=await up(el.files[0]);$('#fu').value=r.p;const f=$('#fi');f.src=r.u;f.hidden=false}
+ else if(a=='bimg'){const r=await up(el.files[0]);$('#ed').focus();if(rg){const s=getSelection();s.removeAllRanges();s.addRange(rg)}document.execCommand('insertHTML',false,'<img src="'+r.u+'" data-src="'+r.p+'" alt="">')}
+ else if(a=='hero'){const r=await up(el.files[0]);grab();Z.hero=r.p;await saveSet('Update hero photo');R()}
+ else if(a=='nohero'){grab();Z.hero='';await saveSet('Remove hero photo');R()}
+ else if(a=='addst'){grab();Z.stats.push({n:'',l:''});R()}
+ else if(a=='rmrow')el.closest('.li').remove();
+ else if(a=='gal'){for(const f of el.files){const r=await up(f);Z.gallery.push({src:r.p,cap:''})}await saveSet('Add gallery photos');R()}
+ else if(a=='mvg'){grab();if(i>0)[Z.gallery[i-1],Z.gallery[i]]=[Z.gallery[i],Z.gallery[i-1]];await saveSet('Reorder gallery');R()}
+ else if(a=='rmg'){grab();Z.gallery.splice(i,1);await saveSet('Update gallery');R()}
+ else if(a=='tp'){const r=await up(el.files[0]);grab();Z.team[i].p=r.p;await saveSet('Update team photo');R()}
+ else if(a=='addt'){grab();Z.team.push({n:'',r:'',p:'',b:''});R()}
+ else if(a=='rmt'){grab();Z.team.splice(i,1);await saveSet('Update team');R()}
+ else if(a=='saveset'||a=='savegal'||a=='savet')await saveSet();
+}catch(x){toast('Error: '+x.message)}};
+const boot=async()=>{$('#app').innerHTML='<div class="ad"><p>Loading…</p></div>';const r=await api('');S.branch=r.default_branch;if(!r.permissions||!r.permissions.push)throw new Error('this token cannot write to the repository');D.posts=(await get('data/posts.json')).d||[];D.set=Object.assign({social:{},bank:{},giscus:{},stats:[],gallery:[],team:[]},(await get('data/settings.json')).d||{});R()};
+const login=()=>{const p1=location.pathname.split('/')[1],h=location.hostname.endsWith('.github.io')?location.hostname.split('.')[0]+'/'+(p1&&!p1.includes('.')?p1:location.hostname):'';
+ $('#app').innerHTML=`<div class="ad" style="max-width:520px"><div class="pn2"><h1 style="font-size:38px">Admin</h1><p style="margin:10px 0 18px">Sign in with GitHub to manage your site and blog.</p><form id="lg" style="display:grid;gap:14px"><label>Repository (owner/name)<input name="repo" required value="${h}"></label><label>GitHub token<input name="tok" type="password" required autocomplete="off"></label><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="rm" style="width:auto;margin:0"> Remember me on this device</label><button class="b s">Sign in</button></form><details style="margin-top:18px"><summary><b>How do I get a token?</b></summary><ol style="padding-left:20px;margin-top:8px"><li>On GitHub open Settings, Developer settings, Personal access tokens, Fine-grained tokens.</li><li>Choose Generate new token. Under Repository access pick Only select repositories and choose your website repo.</li><li>Under Permissions set Contents to Read and write.</li><li>Generate the token, copy it and paste it here. Keep it private.</li></ol></details></div></div>`};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(b&&b.type!='file')run(b.dataset.a,b)});
+document.addEventListener('change',e=>{const b=e.target;if(b.type=='file'&&b.dataset.a&&b.files.length)run(b.dataset.a,b)});
+document.addEventListener('mousedown',e=>{if(e.target.closest('.tb'))e.preventDefault()});
+document.addEventListener('selectionchange',()=>{const s=getSelection(),ed=$('#ed');if(ed&&s.rangeCount&&ed.contains(s.anchorNode))rg=s.getRangeAt(0)});
+document.addEventListener('paste',e=>{if(e.target.id=='ed'){e.preventDefault();document.execCommand('insertText',false,e.clipboardData.getData('text/plain'))}});
+document.addEventListener('input',e=>{if(e.target.id=='t'&&E&&E._new&&!$('#sl').dataset.m)$('#sl').value=slug(e.target.value);if(e.target.id=='sl')e.target.dataset.m=1});
+document.addEventListener('submit',async e=>{if(e.target.id!='lg')return;e.preventDefault();const f=new FormData(e.target);S={repo:f.get('repo').trim(),token:f.get('tok').trim()};try{await boot();(f.get('rm')?localStorage:sessionStorage).gh=JSON.stringify(S)}catch(x){S=null;login();toast('Could not sign in: '+x.message)}});
+S?boot().catch(x=>{S=null;login();toast('Please sign in again: '+x.message)}):login();
+</script></body></html>

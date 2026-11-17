@@ -1,11 +1,11 @@
-HopeAlive Foundation website v2 (static, GitHub Pages ready)
+HopeAlive Foundation website v3 (static, GitHub Pages ready, with admin)
 
-1. Upload ALL files in this folder to the ROOT of your GitHub repo (index.html must be at the root).
+1. Upload ALL files and the data folder to the ROOT of your GitHub repo (index.html at the root). Delete the old posts.js if it is still there.
 2. Repo > Settings > Pages > Deploy from a branch > main / (root) > Save.
-3. Open site.js and edit the CONFIG block at the top. Everything new stays hidden until you fill it:
-   - hero: home-page photo.  gallery: your programme photos.  team: photos (p) and short bios (b).
-   - PHOTOS FROM GOOGLE DRIVE: set each file to "Anyone with the link" > Share > Copy link, then paste that link as the photo. Or upload images to the repo and use their file paths.
-   - donateLink: Paystack/Flutterwave/GoFundMe page. bank: the Foundation's own account (visitors get a Copy button).
-   - formspree: create a free form at formspree.io and paste its URL so the contact form sends directly.
-   - whatsapp: adds a floating chat button. stats: real impact numbers for the home page.
-4. Blog: open posts.js, copy a post block and change slug, date, tag, title, excerpt and body.
+3. ADMIN: open yoursite/admin.html. Sign in with your repo name (owner/name) and a GitHub fine-grained token:
+   GitHub > Settings > Developer settings > Personal access tokens > Fine-grained tokens > Generate new token >
+   Only select repositories (your site) > Permissions > Contents: Read and write. Keep the token private.
+4. In admin you can write, edit, draft and delete blog posts, upload photos, and manage hero photo, impact numbers,
+   gallery, trustees, contact details, social links, bank details, donation link, contact form and comments.
+   Changes go live about a minute after saving. Content lives in data/posts.json and data/settings.json.
+5. Comments (optional): enable Discussions on your repo, get the Giscus values at giscus.app and paste them in admin > Settings.

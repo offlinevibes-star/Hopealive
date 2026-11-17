@@ -44,6 +44,10 @@ document.onclick=e=>{const t=e.target,i=t.dataset&&t.dataset.i;
  else if(t==lb||t.matches('.x'))lb.classList.remove('on')};
 document.onkeydown=e=>{if(!lb.classList.contains('on'))return;if(e.key=='Escape')lb.classList.remove('on');if(e.key=='ArrowLeft')show(gi-1);if(e.key=='ArrowRight')show(gi+1)};
 let tx=0;lb.ontouchstart=e=>{tx=e.touches[0].clientX};lb.ontouchend=e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50)show(gi+(d<0?1:-1))};
+(async()=>{
+const J=async f=>{try{const r=await fetch(f+'?v='+Date.now());return r.ok?await r.json():null}catch(_){return null}};
+const [st,po]=await Promise.all([J('data/settings.json'),J('data/posts.json')]);
+if(st)Object.assign(C,st);
 set('#pill',PIL.map(([c,t,d],i)=>`<li style="--c:var(${c})"><svg aria-hidden="true"><use href="#s${i+1}"/></svg><h3>${t}</h3><p>${d}</p></li>`).join(''));
 set('#tiles',PIL.map(([c,t],i)=>`<a class="tile" href="programmes.html" style="--c:var(${c})"><svg aria-hidden="true"><use href="#s${i+1}"/></svg>${t}</a>`).join(''));
 set('#crew',C.team.map((t,i)=>`<div><div class="av" style="--c:var(${COL[i%3]})">${t.p?`<img src="${IMG(t.p)}" alt="${t.n}">`:t.n.split(' ').map(w=>w[0]).join('')}</div><h3>${t.n}</h3><p><b>${t.r}</b></p>${t.b?`<p style="margin-top:8px">${t.b}</p>`:''}</div>`).join(''));
@@ -68,19 +72,31 @@ if(fm)fm.onsubmit=async e=>{e.preventDefault();const f=new FormData(fm),st=$('#f
  if(C.formspree){st.textContent='Sending…';try{const r=await fetch(C.formspree,{method:'POST',body:f,headers:{Accept:'application/json'}});if(!r.ok)throw 0;fm.reset();st.textContent='Thank you. Your message has been sent.'}catch(_){st.textContent='Sorry, that did not send. Please email us directly.'}return}
  location.href=`mailto:${C.email}?subject=${encodeURIComponent('Message from '+f.get('name'))}&body=${encodeURIComponent(f.get('msg')+'\n\n'+f.get('name')+', '+f.get('email'))}`};
 // ===== BLOG =====
-const P=(typeof POSTS!='undefined'?POSTS:[]).slice().sort((a,b)=>b.date.localeCompare(a.date));
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ALL=(po||[]).filter(p=>!p.draft).sort((a,b)=>b.date.localeCompare(a.date));
+const cat=p=>p.cat||p.tag||'General',qs=new URLSearchParams(location.search);
 const fmt=d=>new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
-const row=(p,i)=>`<a class="row" href="post.html?p=${p.slug}"><div class="th" style="--c:var(${COL[i%5]})">${p.img?`<img src="${IMG(p.img)}" alt="">`:`<svg aria-hidden="true"><use href="#s${i%5+1}"/></svg>`}</div><div><div class="meta"><span>${fmt(p.date)}</span><span class="tag">${p.tag}</span></div><h3>${p.title}</h3><p>${p.excerpt}</p></div></a>`;
-set('#latest',P.slice(0,3).map(row).join(''));
+const mon=m=>new Date(m+'-01T00:00:00').toLocaleDateString('en-GB',{month:'long',year:'numeric'});
 const rt=p=>Math.max(1,Math.round(p.body.replace(/<[^>]+>/g,' ').split(/\s+/).length/200))+' min read';
+const lk=(k,v)=>`blog.html?${k}=${encodeURIComponent(v)}`,pu=p=>`post.html?p=${encodeURIComponent(p.slug)}`;
+const thumb=(p,i)=>p.img?`<img src="${IMG(p.img)}" alt="" loading="lazy">`:`<svg aria-hidden="true"><use href="#s${i%5+1}"/></svg>`;
+const row=(p,i)=>`<a class="row" href="${pu(p)}"><div class="th" style="--c:var(${COL[i%5]})">${thumb(p,i)}</div><div><div class="meta"><span>${fmt(p.date)}</span><span class="tag">${esc(cat(p))}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.excerpt)}</p></div></a>`;
+const card=(p,i)=>`<article class="post"><a class="pimg" href="${pu(p)}" style="--c:var(${COL[i%5]})">${thumb(p,i)}</a><div class="meta"><a class="tag" href="${lk('cat',cat(p))}">${esc(cat(p))}</a><span>${fmt(p.date)}</span><span>${rt(p)}</span></div><h2><a href="${pu(p)}">${esc(p.title)}</a></h2><p>${esc(p.excerpt)}</p><a class="more" href="${pu(p)}">Continue reading</a></article>`;
+const cnt=f=>{const m={};ALL.forEach(p=>f(p).forEach(k=>m[k]=(m[k]||0)+1));return Object.entries(m)};
+set('#latest',ALL.slice(0,3).map(row).join(''));
+set('#side',`<form class="srch" action="blog.html"><input name="q" type="search" placeholder="Search the blog" aria-label="Search the blog"><button class="btn">Search</button></form><div class="wd"><h3>About</h3><p>HopeAlive Foundation protects children, opens doors to education and helps communities thrive.</p></div><div class="wd"><h3>Recent posts</h3><ul>${ALL.slice(0,5).map(p=>`<li><a href="${pu(p)}">${esc(p.title)}</a></li>`).join('')}</ul></div><div class="wd"><h3>Categories</h3><ul>${cnt(p=>[cat(p)]).map(([k,n])=>`<li><a href="${lk('cat',k)}">${esc(k)}</a> (${n})</li>`).join('')}</ul></div><div class="wd"><h3>Tags</h3><p class="cloud">${cnt(p=>p.tags||[]).map(([k])=>`<a class="tag" href="${lk('tag',k)}">${esc(k)}</a>`).join('')}</p></div><div class="wd"><h3>Archives</h3><ul>${cnt(p=>[p.date.slice(0,7)]).sort().reverse().map(([k,n])=>`<li><a href="${lk('m',k)}">${mon(k)}</a> (${n})</li>`).join('')}</ul></div>`);
 const bl=$('#posts');
-if(bl){const ch=$('#chips'),q=$('#q');let tg='All';
- const draw=()=>{const s=q.value.toLowerCase();bl.innerHTML=P.filter(p=>(tg=='All'||p.tag==tg)&&(p.title+p.excerpt+p.body).toLowerCase().includes(s)).map(row).join('')||'<p style="padding:24px 0">No posts match. Try another search or topic.</p>';[...ch.children].forEach(b=>b.setAttribute('aria-pressed',b.textContent==tg))};
- ch.innerHTML=['All',...new Set(P.map(p=>p.tag))].map(t=>`<button>${t}</button>`).join('');
- ch.onclick=e=>{if(e.target.tagName=='BUTTON'){tg=e.target.textContent;draw()}};q.oninput=draw;draw()}
+if(bl){const c=qs.get('cat'),t=qs.get('tag'),m=qs.get('m'),q=(qs.get('q')||'').toLowerCase(),N=6,n=Math.max(1,+qs.get('page')||1);
+ const L=ALL.filter(p=>(!c||cat(p)==c)&&(!t||(p.tags||[]).includes(t))&&(!m||p.date.startsWith(m))&&(!q||(p.title+p.excerpt+p.body).toLowerCase().includes(q)));
+ const tp=Math.max(1,Math.ceil(L.length/N)),pl=k=>{const u=new URLSearchParams(location.search);u.set('page',k);return 'blog.html?'+u};
+ const h=c?'Category: '+c:t?'Tag: '+t:m?'Archive: '+mon(m):q?'Search results for “'+qs.get('q')+'”':'';
+ bl.innerHTML=(h?`<h2 class="ft">${esc(h)} <a href="blog.html">Clear</a></h2>`:'')+(L.slice((n-1)*N,n*N).map(card).join('')||'<p>No posts found.</p>')+(tp>1?`<nav class="pager" aria-label="Pages">${n>1?`<a href="${esc(pl(n-1))}">Newer posts</a>`:'<span></span>'}<span>Page ${n} of ${tp}</span>${n<tp?`<a href="${esc(pl(n+1))}">Older posts</a>`:'<span></span>'}</nav>`:'')}
 const pe=$('#post');
-if(pe){const p=P.find(x=>x.slug==new URLSearchParams(location.search).get('p'));
+if(pe){const i=ALL.findIndex(x=>x.slug==qs.get('p')),p=ALL[i];
  if(!p)pe.innerHTML='<h1>Post not found</h1><p style="margin-top:18px">It may have moved. <a href="blog.html"><b>Browse all posts</b></a></p>';
  else{document.title=p.title+' | HopeAlive Foundation';$('meta[name=description]').content=p.excerpt;
-  const u=encodeURIComponent(location.href),t=encodeURIComponent(p.title),more=P.filter(x=>x!==p).sort((a,b)=>(b.tag==p.tag)-(a.tag==p.tag)).slice(0,2);
-  pe.innerHTML=`<div class="meta"><span>${fmt(p.date)}</span><span class="tag">${p.tag}</span><span>${rt(p)}</span></div><h1>${p.title}</h1>${p.img?`<img src="${IMG(p.img)}" alt="">`:''}<div class="body">${p.body}</div><p class="share"><b>Share:</b> <a href="https://wa.me/?text=${t}%20${u}">WhatsApp</a><a href="https://www.facebook.com/sharer/sharer.php?u=${u}">Facebook</a><a href="https://x.com/intent/tweet?text=${t}&url=${u}">X</a><button class="cp" data-c="${location.href}">Copy link</button></p>${more.length?`<h2 style="margin-top:56px;font-size:30px">Keep reading</h2><div class="rows">${more.map(row).join('')}</div>`:''}`}}
+  const u=encodeURIComponent(location.href),t=encodeURIComponent(p.title),au=esc(p.author||'HopeAlive Foundation'),o=ALL[i+1],nw=ALL[i-1],more=ALL.filter(x=>x!==p).sort((a,b)=>(cat(b)==cat(p))-(cat(a)==cat(p))).slice(0,3);
+  pe.innerHTML=`<nav class="crumbs"><a href="index.html">Home</a> / <a href="blog.html">Blog</a> / <a href="${lk('cat',cat(p))}">${esc(cat(p))}</a></nav><h1>${esc(p.title)}</h1><div class="meta"><span>By ${au}</span><span>${fmt(p.date)}</span><span>${rt(p)}</span></div>${p.img?`<img class="hero-img" src="${IMG(p.img)}" alt="">`:''}<div class="body">${p.body}</div><p class="tags">${(p.tags||[]).map(k=>`<a class="tag" href="${lk('tag',k)}">${esc(k)}</a>`).join('')}</p><p class="share"><b>Share:</b> <a href="https://wa.me/?text=${t}%20${u}">WhatsApp</a><a href="https://www.facebook.com/sharer/sharer.php?u=${u}">Facebook</a><a href="https://x.com/intent/tweet?text=${t}&amp;url=${u}">X</a><button class="cp" data-c="${esc(location.href)}">Copy link</button></p><div class="author"><b>Written by ${au}</b><p>HopeAlive Foundation protects children, opens doors to education and helps communities thrive.</p></div><nav class="pn">${o?`<a href="${pu(o)}"><small>Older post</small>${esc(o.title)}</a>`:'<span></span>'}${nw?`<a href="${pu(nw)}"><small>Newer post</small>${esc(nw.title)}</a>`:'<span></span>'}</nav>${more.length?`<h2 style="margin-top:40px;font-size:30px">Related posts</h2><div class="rows">${more.map(row).join('')}</div>`:''}<div id="cm"></div>`;
+  const g=C.giscus;
+  if(g&&g.repo){const cm=$('#cm'),sc=document.createElement('script');cm.innerHTML='<h2 style="margin-top:40px;font-size:30px">Comments</h2>';sc.src='https://giscus.app/client.js';Object.entries({'data-repo':g.repo,'data-repo-id':g.repoId,'data-category':g.category,'data-category-id':g.categoryId,'data-mapping':'specific','data-term':p.slug,'data-theme':'light','data-lang':'en',crossorigin:'anonymous'}).forEach(([k,v])=>sc.setAttribute(k,v));sc.async=true;cm.append(sc)}}}
+})();
