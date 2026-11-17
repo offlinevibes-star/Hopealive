@@ -1,0 +1,14 @@
+// BLOG POSTS: copy a block, give it a unique slug (lowercase, hyphens), set date as YYYY-MM-DD.
+// Newest posts appear first automatically. img is optional (e.g. 'images/post.jpg'). body accepts HTML (<p>, <h2>, <ul>, <a>).
+// Replace these starter posts with your own news.
+const POSTS=[
+{slug:'welcome',date:'2026-11-15',tag:'News',title:'Welcome to HopeAlive Foundation',img:'',
+ excerpt:'Who we are, what we believe and what you can expect from this blog.',
+ body:`<p>HopeAlive Foundation for Education and Community Development is a not-for-profit, non-political organisation based in Aba, Abia State. We were registered with Nigeria’s Corporate Affairs Commission as Incorporated Trustees on 14 August 2025.</p><p>Our work rests on five objectives: protecting children, creating educational opportunities for vulnerable children, healing through the arts, promoting sustainable community-led development, and empowering youth and disadvantaged communities.</p><h2>What to expect here</h2><p>This blog is where we will share news from our programmes, stories from the communities we serve and practical ways to get involved. Thank you for following our journey.</p>`},
+{slug:'arts-for-healing',date:'2026-11-12',tag:'Programmes',title:'Why we use sports, music, dance and drama to help children heal',img:'',
+ excerpt:'Creative activities give traumatised children safe ways to express themselves and rebuild trust.',
+ body:`<p>Children who have been through difficult experiences often find it hard to put those experiences into words. Sports, music, dance and drama offer other ways to express feelings, build trust with others and rediscover joy.</p><p>That is why rehabilitation through the arts is one of the five objectives in our constitution. We want every child to have a safe space to play, perform and be heard.</p><h2>Our approach</h2><p>Our aim is to bring creative activities into the places where children live and learn, and to work alongside families, schools and communities so that support continues beyond each session.</p>`},
+{slug:'ways-to-help',date:'2026-11-09',tag:'Get involved',title:'Five ways you can support HopeAlive',img:'',
+ excerpt:'Give, volunteer, partner, share our work or simply stay in touch.',
+ body:`<p>Every child deserves to be safe, to learn and to dream. Here are five ways you can help.</p><ul><li><b>Give.</b> Financial gifts help us mobilise resources for vulnerable children. See our <a href="get-involved.html">Get involved</a> page.</li><li><b>Volunteer.</b> Teachers, coaches, artists, counsellors and creatives can lend their skills.</li><li><b>Partner.</b> Schools, businesses, faith groups, agencies and fellow NGOs can work with us.</li><li><b>Share.</b> Tell friends and family about our work and share our posts.</li><li><b>Stay in touch.</b> <a href="contact.html">Send us a message</a> and tell us how you would like to help.</li></ul>`}
+];
