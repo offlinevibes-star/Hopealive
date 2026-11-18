@@ -18,6 +18,7 @@ const CONFIG={
 };
 // ===== SITE CODE =====
 const C=CONFIG,$=s=>document.querySelector(s),B=document.body,pg=B.dataset.page;
+const hopeDbReady=new Promise(resolve=>{const s=document.createElement('script');s.src='supabase-client.js';s.onload=()=>window.hopeSupabaseReady.then(resolve).catch(()=>resolve(null));s.onerror=()=>resolve(null);document.head.appendChild(s)});
 const set=(s,h)=>{const e=$(s);if(e)e.innerHTML=h};
 const IMG=u=>{const m=/drive\.google\.com\/.*?(?:\/d\/|[?&]id=)([\w-]+)/.exec(u||'');return m?`https://lh3.googleusercontent.com/d/${m[1]}=w1400`:u};
 const COL=['--sun','--coral','--leaf','--plum','--sky'];
@@ -46,8 +47,9 @@ document.onkeydown=e=>{if(!lb.classList.contains('on'))return;if(e.key=='Escape'
 let tx=0;lb.ontouchstart=e=>{tx=e.touches[0].clientX};lb.ontouchend=e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50)show(gi+(d<0?1:-1))};
 (async()=>{
 const J=async f=>{try{const r=await fetch(f+'?v='+Date.now());return r.ok?await r.json():null}catch(_){return null}};
-const [st,po]=await Promise.all([J('data/settings.json'),J('data/posts.json')]);
-if(st)Object.assign(C,st);
+const db=await hopeDbReady;let st=null,po=null;
+if(db){try{const [{data:sr,error:se},{data:pr,error:pe}]=await Promise.all([db.from('site_settings').select('settings').eq('id',1).maybeSingle(),db.from('posts').select('*').eq('is_draft',false).order('published_at',{ascending:false})]);if(!se&&sr)st=sr.settings;if(!pe&&pr)po=pr.map(p=>({slug:p.slug,title:p.title,date:p.published_at||'',cat:p.category,tags:p.tags||[],author:p.author,excerpt:p.excerpt,img:p.featured_image,body:p.body_html,draft:p.is_draft}))}catch(_){}}
+if(!st)st=await J('data/settings.json');if(!po)po=await J('data/posts.json');if(st)Object.assign(C,st);
 set('#pill',PIL.map(([c,t,d],i)=>`<li style="--c:var(${c})"><svg aria-hidden="true"><use href="#s${i+1}"/></svg><h3>${t}</h3><p>${d}</p></li>`).join(''));
 set('#tiles',PIL.map(([c,t],i)=>`<a class="tile" href="programmes.html" style="--c:var(${c})"><svg aria-hidden="true"><use href="#s${i+1}"/></svg>${t}</a>`).join(''));
 set('#crew',C.team.map((t,i)=>`<div><div class="av" style="--c:var(${COL[i%3]})">${t.p?`<img src="${IMG(t.p)}" alt="${t.n}">`:t.n.split(' ').map(w=>w[0]).join('')}</div><h3>${t.n}</h3><p><b>${t.r}</b></p>${t.b?`<p style="margin-top:8px">${t.b}</p>`:''}</div>`).join(''));
@@ -68,9 +70,11 @@ const S=Object.entries(C.social).filter(([,u])=>u);
 if(S.length)L.push(['Follow us',S.map(([k,u])=>`<a href="${u}" target="_blank" rel="noopener">${k}</a>`).join(', ')]);
 set('#details',L.map(([k,v])=>`<p><b>${k}</b><br>${v}</p>`).join(''));
 const fm=$('#form');
-if(fm)fm.onsubmit=async e=>{e.preventDefault();const f=new FormData(fm),st=$('#fs');
- if(C.formspree){st.textContent='Sending…';try{const r=await fetch(C.formspree,{method:'POST',body:f,headers:{Accept:'application/json'}});if(!r.ok)throw 0;fm.reset();st.textContent='Thank you. Your message has been sent.'}catch(_){st.textContent='Sorry, that did not send. Please email us directly.'}return}
- location.href=`mailto:${C.email}?subject=${encodeURIComponent('Message from '+f.get('name'))}&body=${encodeURIComponent(f.get('msg')+'\n\n'+f.get('name')+', '+f.get('email'))}`};
+if(fm)fm.onsubmit=async e=>{e.preventDefault();const f=new FormData(fm),status=$('#fs');status.textContent='Sending…';const payload={sender_name:String(f.get('name')||'').trim(),sender_email:String(f.get('email')||'').trim(),message:String(f.get('msg')||'').trim()};
+ if(db){try{const {error}=await db.from('contact_messages').insert(payload);if(error)throw error;fm.reset();status.textContent='Thank you. Your message has been sent.';return}catch(err){console.error('Supabase contact submission failed',err)}}
+ if(C.formspree){try{const r=await fetch(C.formspree,{method:'POST',body:f,headers:{Accept:'application/json'}});if(!r.ok)throw 0;fm.reset();status.textContent='Thank you. Your message has been sent.'}catch(_){status.textContent='Sorry, that did not send. Please email us directly.'}return}
+ status.textContent='Sorry, the message could not be sent. Please email us directly.';
+};
 // ===== BLOG =====
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ALL=(po||[]).filter(p=>!p.draft).sort((a,b)=>b.date.localeCompare(a.date));
