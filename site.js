@@ -48,7 +48,7 @@ let tx=0;lb.ontouchstart=e=>{tx=e.touches[0].clientX};lb.ontouchend=e=>{const d=
 (async()=>{
 const J=async f=>{try{const r=await fetch(f+'?v='+Date.now());return r.ok?await r.json():null}catch(_){return null}};
 const db=await hopeDbReady;let st=null,po=null;
-if(db){try{const [{data:sr,error:se},{data:pr,error:pe}]=await Promise.all([db.from('site_settings').select('settings').eq('id',1).maybeSingle(),db.from('posts').select('*').eq('is_draft',false).order('published_at',{ascending:false})]);if(!se&&sr)st=sr.settings;if(!pe&&pr)po=pr.map(p=>({slug:p.slug,title:p.title,date:p.published_at||'',cat:p.category,tags:p.tags||[],author:p.author,excerpt:p.excerpt,img:p.featured_image,body:p.body_html,draft:p.is_draft}))}catch(_){}}
+if(db){try{const [{data:sr,error:se},{data:pr,error:pe}]=await Promise.all([db.from('site_settings').select('settings').eq('id',1).maybeSingle(),db.from('posts').select('*').eq('is_draft',false).order('published_at',{ascending:false})]);if(!se&&sr&&sr.settings&&Object.keys(sr.settings).length)st=sr.settings;if(!pe&&pr&&pr.length)po=pr.map(p=>({slug:p.slug,title:p.title,date:p.published_at||'',cat:p.category,tags:p.tags||[],author:p.author,excerpt:p.excerpt,img:p.featured_image,body:p.body_html,draft:p.is_draft}))}catch(_){}}
 if(!st)st=await J('data/settings.json');if(!po)po=await J('data/posts.json');if(st)Object.assign(C,st);
 set('#pill',PIL.map(([c,t,d],i)=>`<li style="--c:var(${c})"><svg aria-hidden="true"><use href="#s${i+1}"/></svg><h3>${t}</h3><p>${d}</p></li>`).join(''));
 set('#tiles',PIL.map(([c,t],i)=>`<a class="tile" href="programmes.html" style="--c:var(${c})"><svg aria-hidden="true"><use href="#s${i+1}"/></svg>${t}</a>`).join(''));
