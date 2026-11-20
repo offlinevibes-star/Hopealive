@@ -52,6 +52,62 @@ create unique index if not exists media_cleanup_jobs_active_path_uidx
 create index if not exists media_cleanup_jobs_status_created_idx
   on public.media_cleanup_jobs (status, created_at);
 
+-- Serialize new content references against the pending-delete/cleanup state.
+-- The row locks mean a content write and a cleanup request cannot pass one another
+-- without one side observing the other's committed state.
+create or replace function public.prevent_referencing_pending_media()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $
+declare
+  v_new_row jsonb := to_jsonb(new);
+  v_conflict_id uuid;
+begin
+  for v_conflict_id in
+    select m.id
+    from public.media_assets m
+    where m.delete_pending
+      and (
+        v_new_row::text ilike '%' || m.storage_path || '%'
+        or (m.public_url is not null and v_new_row::text ilike '%' || m.public_url || '%')
+      )
+    for share of m
+  loop
+    raise exception 'Media asset is pending deletion and cannot be attached to content'
+      using errcode = '23503';
+  end loop;
+
+  for v_conflict_id in
+    select j.id
+    from public.media_cleanup_jobs j
+    where j.status in ('pending', 'running', 'failed', 'blocked')
+      and (
+        v_new_row::text ilike '%' || j.storage_path || '%'
+        or (j.reference_url is not null and v_new_row::text ilike '%' || j.reference_url || '%')
+      )
+    for share of j
+  loop
+    raise exception 'Media Storage object has a pending cleanup job'
+      using errcode = '23503';
+  end loop;
+
+  return new;
+end;
+$;
+revoke all on function public.prevent_referencing_pending_media() from public, anon, authenticated;
+
+drop trigger if exists prevent_pending_media_reference_on_posts on public.posts;
+create trigger prevent_pending_media_reference_on_posts
+  before insert or update of featured_image, body_html, media on public.posts
+  for each row execute function public.prevent_referencing_pending_media();
+
+drop trigger if exists prevent_pending_media_reference_on_settings on public.site_settings;
+create trigger prevent_pending_media_reference_on_settings
+  before insert or update of settings on public.site_settings
+  for each row execute function public.prevent_referencing_pending_media();
+
 -- Browser administrators must request deletions through the authenticated Edge Function.
 revoke delete on public.media_assets from anon, authenticated;
 grant select, insert, update on public.media_assets to authenticated;
