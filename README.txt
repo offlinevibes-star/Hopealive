@@ -8,4 +8,5 @@ HopeAlive Foundation website v3 (static, GitHub Pages ready, with admin)
 4. In admin you can write, edit, draft and delete blog posts, upload photos, and manage hero photo, impact numbers,
    gallery, trustees, contact details, social links, bank details, donation link, contact form and comments.
    Changes go live about a minute after saving. Content lives in data/posts.json and data/settings.json.
+5. Media setup: in Supabase SQL Editor, run `supabase/migrations/002_media_library.sql` after the initial CMS migration. It creates the public media bucket and admin-only upload/edit/delete policies. Images and videos up to 50 MB per file are accepted.
 5. Comments (optional): enable Discussions on your repo, get the Giscus values at giscus.app and paste them in admin > Settings.
