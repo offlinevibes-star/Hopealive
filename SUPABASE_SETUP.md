@@ -17,6 +17,7 @@ Use Supabase CLI in a trusted workstation or the Supabase SQL Editor, reviewing 
 5. supabase/migrations/005_media_operations_and_contact_limits.sql
 6. supabase/migrations/006_policy_and_index_cleanup.sql
 7. supabase/migrations/007_atomic_media_cleanup_claim.sql
+8. supabase/migrations/008_atomic_media_reference_lock.sql
 
 Migration 004's administrator auth-event function uses corrected PostgreSQL dollar-quoting in this branch. Migration 005 is additive and:
 - Adds media display-name, alt-text and pending-deletion metadata where absent, and creates media search/pagination indexes.
@@ -27,6 +28,8 @@ Migration 004's administrator auth-event function uses corrected PostgreSQL doll
 - Adds global, email and optional trusted-IP rate-limit keys using a service-role-only function.
 
 Migration 007 adds an atomic, service-role-only cleanup-job claim. It prevents two concurrent admin requests from processing the same job and permits a stuck running job to be reclaimed only after the retry timeout.
+
+Migration 008 closes the race between a new post/site-setting reference and a cleanup/visibility request. Content writes take a shared transaction-scoped advisory lock; media cleanup and visibility RPCs take the matching exclusive lock before checking references and committing the cleanup job or metadata switch. The visibility RPC also rejects an asset already marked pending deletion.
 
 Migration 006 makes is_hopealive_admin() a SECURITY INVOKER helper backed by an RLS policy that lets an authenticated user read only their own admin allow-list row. It adds explicit deny policies for internal rate-limit/cleanup tables, consolidates post SELECT policies by role, and indexes the audit/cleanup foreign keys.
 
@@ -45,7 +48,7 @@ The allow-list has RLS enabled. An authenticated user can read only their own me
 
 ## Deploy Edge Functions
 
-After migrations 001–007 are applied in the target environment:
+After migrations 001–008 are applied in the target environment:
 
 ~~~sh
 supabase functions deploy contact-submit --no-verify-jwt
