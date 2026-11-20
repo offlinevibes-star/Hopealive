@@ -81,6 +81,9 @@ test("contact endpoint enforces streamed byte limits and production Turnstile", 
 
 test("admin audit trail is restricted and rate-limit cleanup is service-role only", () => {
   assert.match(mediaMigration, /admin_activity_logs/);
+  assert.ok(mediaMigration.includes("record_admin_auth_event"));
+  assert.ok(admin.includes("p_action:'login'"));
+  assert.ok(admin.includes("p_action:'logout'"));
   assert.match(mediaMigration, /public\.is_hopealive_admin\(\)/);
   assert.match(mediaMigration, /cleanup_contact_rate_limits/);
   assert.match(mediaMigration, /to service_role/);
