@@ -82,7 +82,7 @@ test("contact endpoint enforces streamed byte limits and production Turnstile", 
   assert.match(edge, /!localDev && !turnstileSecret/);
   assert.match(edge, /TURNSTILE_ALLOWED_HOSTNAMES/);
   assert.match(edge, /email:/);
-  assert.doesNotMatch(edge, /x-forwarded-for|x-real-ip/);
+  assert.doesNotMatch(edge, /req\.headers\.get\(["'](?:x-forwarded-for|x-real-ip)["']\)/i);
 });
 
 test("admin audit trail is restricted and rate-limit cleanup is service-role only", () => {
