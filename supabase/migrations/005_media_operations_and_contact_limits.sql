@@ -56,10 +56,11 @@ create index if not exists media_cleanup_jobs_status_created_idx
 revoke delete on public.media_assets from anon, authenticated;
 grant select, insert, update on public.media_assets to authenticated;
 
--- All object deletions must pass through the reference-aware service-role cleanup queue.
+-- Remove only the HopeAlive bucket delete policies. storage.objects is shared by
+-- every bucket in the Supabase project, so do not revoke table-wide DELETE grants.
+-- HopeAlive objects are now deleted only by the service-role cleanup function.
 drop policy if exists "HopeAlive admins delete media files" on storage.objects;
 drop policy if exists "HopeAlive admins delete private media files" on storage.objects;
-revoke delete on storage.objects from anon, authenticated;
 
 -- Keep published reads public while avoiding the deprecated auth.role() policy expression.
 drop policy if exists "Read published posts or admin posts" on public.posts;
