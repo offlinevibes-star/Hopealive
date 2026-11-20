@@ -24,7 +24,7 @@ The query uses the media_assets metadata table. Missing private objects, inacces
 - Unpublished assets live in the private hopealive-private-media bucket and are previewed with short-lived signed URLs.
 - Visibility moves are handled by the authenticated admin-media Edge Function. The target object is copied first; only then is the metadata switched. The old object is recorded in the cleanup queue and removed after the metadata update.
 - Visibility changes are blocked when a post (published or draft) or public site setting refers to the asset path/URL. Update those content references first.
-- The metadata switch and cleanup queue insertion are committed together in Postgres. Database triggers also block new post/site-settings references while an asset or orphan cleanup job is pending, serializing content writes against cleanup for the known HopeAlive content tables. Storage object copying/deletion remains a separate Storage API operation; the cleanup queue makes incomplete steps observable and retryable.
+- The metadata switch and cleanup queue insertion are committed together in Postgres. Content writes take a shared transaction-scoped advisory lock; delete, orphan-cleanup and visibility RPCs take the matching exclusive lock before checking references and committing their state. This closes the race where a post could otherwise attach an object while a deletion request was being enqueued. The cleanup queue also blocks references until an object cleanup job completes. Storage copying/deletion remains a separate Storage API operation; the durable queue makes incomplete steps observable and retryable.
 
 ## Safe deletion
 
@@ -45,7 +45,7 @@ The reference scan searches the full serialized post rows (including the JSON at
 
 ## Operational requirements
 
-1. Apply migrations 001–007 in order in a reviewed maintenance window.
+1. Apply migrations 001–008 in order in a reviewed maintenance window.
 2. Deploy admin-media with JWT verification enabled (the function independently checks the signed-in user's identity and admin allow-list membership before using the service role).
 3. Confirm the function's Supabase environment has its standard URL, anon key and service-role key configured. Never expose the service-role key in browser code.
 4. Exercise upload, metadata edits, visibility moves, delete-in-use rejection, transient Storage failure and cleanup retry in an isolated Supabase project before production rollout.
