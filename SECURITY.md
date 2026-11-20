@@ -4,7 +4,7 @@
 
 - Supabase Auth authenticates administrators.
 - `public.admin_users` is the single administrator allow-list. Do not enable public admin registration.
-- The `is_hopealive_admin()` SECURITY DEFINER function returns only a boolean and uses an empty search path.
+- The `is_hopealive_admin()` helper is `SECURITY INVOKER`; `admin_users` RLS allows authenticated users to read only their own membership row. The four authenticated SECURITY DEFINER admin RPCs retain explicit allow-list checks and use an empty search path.
 - RLS policies must remain enabled. Anonymous visitors may read public content only; administrative mutations require an allow-listed authenticated user.
 
 ## Contact submissions
@@ -36,7 +36,7 @@ The static GitHub Pages host does not provide arbitrary response-header configur
 
 ## Operational checks
 
-- Review Supabase Database and Storage RLS policies after schema changes. After migration 005, verify both HopeAlive bucket delete policies are absent while unrelated bucket policies remain unchanged.
+- Review Supabase Database and Storage RLS policies after schema changes. After migration 005, verify both HopeAlive bucket delete policies are absent while unrelated bucket policies remain unchanged. After migration 006, verify that anonymous users see only published posts, signed-in non-admins cannot see drafts, and the admin helper can read only the caller's own allow-list row.
 - Enable leaked-password protection in Supabase Auth.
 - Keep the service-role key only in Edge Function secrets.
 - Schedule `public.cleanup_contact_rate_limits()` daily.
