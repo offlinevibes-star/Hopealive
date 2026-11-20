@@ -4,7 +4,7 @@
 -- Store import provenance so the legacy importer can upsert stable source rows.
 alter table public.donations add column if not exists source_key text;
 create unique index if not exists donations_source_key_uidx
-  on public.donations(source_key) where source_key is not null;
+  on public.donations(source_key);
 
 -- Private bucket for media that has not been approved for public display.
 -- Existing public assets are intentionally not moved by this migration.
@@ -88,6 +88,7 @@ grant execute on function public.consume_contact_rate_limit(text) to service_rol
 -- Public messages must go through the rate-limited Edge Function, not direct table inserts.
 drop policy if exists "Visitors may submit contact messages" on public.contact_messages;
 revoke insert on public.contact_messages from anon, authenticated;
+grant insert on public.contact_messages to service_role;
 
 -- Remove overlapping permissive SELECT policies while preserving public published reads and admin access.
 drop policy if exists "Public can read published posts" on public.posts;
