@@ -65,6 +65,7 @@ create policy "Admins read all posts"
   using ((select public.is_hopealive_admin()));
 
 create or replace function public.hopealive_media_content_references(
+  p_storage_bucket text,
   p_storage_path text,
   p_public_url text default null
 )
@@ -73,13 +74,22 @@ language sql
 stable
 security definer
 set search_path = ''
-as $$
+as $
   select
     exists (
       select 1
       from public.posts p
-      where to_jsonb(p)::text ilike '%' || p_storage_path || '%'
-         or (p_public_url is not null and to_jsonb(p)::text ilike '%' || p_public_url || '%')
+      where (p_public_url is not null and to_jsonb(p)::text ilike '%' || p_public_url || '%')
+         or p.featured_image ilike '%' || p_storage_path || '%'
+         or p.body_html ilike '%' || p_storage_path || '%'
+         or exists (
+           select 1
+           from jsonb_array_elements(
+             case when jsonb_typeof(p.media) = 'array' then p.media else '[]'::jsonb end
+           ) attachment
+           where attachment->>'path' = p_storage_path
+             and coalesce(attachment->>'bucket', 'hopealive-media') = p_storage_bucket
+         )
     )
     or exists (
       select 1
@@ -87,7 +97,7 @@ as $$
       where s.settings::text ilike '%' || p_storage_path || '%'
          or (p_public_url is not null and s.settings::text ilike '%' || p_public_url || '%')
     );
-$$;
+$;
 revoke all on function public.hopealive_media_content_references(text, text) from public, anon, authenticated;
 grant execute on function public.hopealive_media_content_references(text, text) to service_role;
 
@@ -116,7 +126,7 @@ begin
       select 1 from public.media_assets m
       where m.storage_bucket = o.bucket_id and m.storage_path = o.name
     )
-    and not public.hopealive_media_content_references(o.name, null);
+    and not public.hopealive_media_content_references(o.bucket_id, o.name, null);
 
   select coalesce(jsonb_agg(jsonb_build_object(
     'bucket', o.bucket_id, 'path', o.name, 'created_at', o.created_at
@@ -128,12 +138,12 @@ begin
       select 1 from public.media_assets m
       where m.storage_bucket = o.bucket_id and m.storage_path = o.name
     )
-    and public.hopealive_media_content_references(o.name, null);
+    and public.hopealive_media_content_references(o.bucket_id, o.name, null);
 
   select coalesce(jsonb_agg(jsonb_build_object(
     'id', m.id, 'bucket', m.storage_bucket, 'path', m.storage_path,
     'display_name', m.display_name, 'delete_pending', m.delete_pending,
-    'is_referenced', public.hopealive_media_content_references(m.storage_path, m.public_url)
+    'is_referenced', public.hopealive_media_content_references(m.storage_bucket, m.storage_path, m.public_url)
   ) order by m.created_at), '[]'::jsonb)
   into v_broken
   from public.media_assets m
@@ -179,7 +189,7 @@ begin
     raise exception 'Media record not found' using errcode = 'P0002';
   end if;
 
-  if public.hopealive_media_content_references(v_asset.storage_path, v_asset.public_url) then
+  if public.hopealive_media_content_references(v_asset.storage_bucket, v_asset.storage_path, v_asset.public_url) then
     raise exception 'Media is referenced by a post or public setting and cannot be deleted' using errcode = '23503';
   end if;
 
@@ -234,7 +244,7 @@ begin
   ) then
     raise exception 'Storage object is still registered in the media library' using errcode = '23503';
   end if;
-  if public.hopealive_media_content_references(p_path, null) then
+  if public.hopealive_media_content_references(p_bucket, p_path, null) then
     raise exception 'Storage object is referenced by content and cannot be deleted' using errcode = '23503';
   end if;
   if not exists (
@@ -291,7 +301,7 @@ begin
   if v_asset.storage_bucket = p_target_bucket and v_asset.storage_path = p_target_path then
     return null;
   end if;
-  if public.hopealive_media_content_references(v_asset.storage_path, v_asset.public_url) then
+  if public.hopealive_media_content_references(v_asset.storage_bucket, v_asset.storage_path, v_asset.public_url) then
     raise exception 'Media is referenced by a post or public setting; change the post/media publication state first' using errcode = '23503';
   end if;
 
