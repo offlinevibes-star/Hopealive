@@ -24,7 +24,7 @@ The query uses the media_assets metadata table. Missing private objects, inacces
 - Unpublished assets live in the private hopealive-private-media bucket and are previewed with short-lived signed URLs.
 - Visibility moves are handled by the authenticated admin-media Edge Function. The target object is copied first; only then is the metadata switched. The old object is recorded in the cleanup queue and removed after the metadata update.
 - Visibility changes are blocked when a post (published or draft) or public site setting refers to the asset path/URL. Update those content references first.
-- The metadata switch and cleanup queue insertion are committed together in Postgres. Storage object copying/deletion remains a separate Storage API operation; the cleanup queue makes incomplete steps observable and retryable.
+- The metadata switch and cleanup queue insertion are committed together in Postgres. Database triggers also block new post/site-settings references while an asset or orphan cleanup job is pending, serializing content writes against cleanup for the known HopeAlive content tables. Storage object copying/deletion remains a separate Storage API operation; the cleanup queue makes incomplete steps observable and retryable.
 
 ## Safe deletion
 
