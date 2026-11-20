@@ -46,9 +46,9 @@ test("public contact form submits only through the rate-limited function", () =>
 
 test("unpublished media and draft post attachments use the private bucket", () => {
   assert.match(migration, /hopealive-private-media/);
-  assert.match(admin, /published\?MEDIA_BUCKET:PRIVATE_MEDIA_BUCKET/);
+  assert.match(adminMedia, /published \? MEDIA_BUCKET : PRIVATE_MEDIA_BUCKET/);
   assert.match(admin, /draft\?PRIVATE_MEDIA_BUCKET:MEDIA_BUCKET/);
-  assert.match(admin, /createSignedUrl/);
+  assert.match(adminMedia, /createSignedUrl/);
 });
 
 test("legacy donation import uses stable upsert keys", () => {
@@ -65,12 +65,12 @@ test("password reset does not disclose a prefilled administrator email", () => {
 test("media display names and alt text are editable without changing Storage paths", () => {
   assert.match(mediaMigration, /add column if not exists display_name text/);
   assert.match(mediaMigration, /add column if not exists alt_text text/);
-  assert.match(admin, /data-mdname/);
-  assert.match(admin, /data-malt/);
-  assert.match(admin, /createSignedUrl\(m\.storage_path,300\)/);
-  assert.match(admin, /display_name:/);
-  assert.match(admin, /alt_text:/);
-  assert.match(admin, /Storage filename renaming is deliberately disabled/);
+  assert.match(adminMedia, /data-mdname/);
+  assert.match(adminMedia, /data-malt/);
+  assert.match(adminMedia, /createSignedUrl\(asset\.storage_path, 300\)/);
+  assert.match(adminMedia, /display_name:/);
+  assert.match(adminMedia, /alt_text:/);
+  assert.match(adminMedia, /display-name edits never change media URLs or video playback/);
   assert.match(site, /cap:m\.display_name\|\|m\.filename/);
   assert.match(site, /alt:m\.alt_text\|\|m\.display_name/);
 });
@@ -103,6 +103,13 @@ test("media operations use paginated queries and page-scoped private previews", 
   assert.match(adminMedia, /loading="lazy"/);
   assert.match(adminMedia, /preload="none"/);
   assert.match(adminMedia, /queue_orphan_delete/);
+});
+
+test("browser code cannot directly delete media Storage objects", () => {
+  assert.doesNotMatch(admin, /storage\.from\([^)]*\)\.remove\(/);
+  assert.match(operationsMigration, /revoke delete on storage\.objects from anon, authenticated/i);
+  assert.match(operationsMigration, /drop policy if exists "HopeAlive admins delete media files"/);
+  assert.match(operationsMigration, /drop policy if exists "HopeAlive admins delete private media files"/);
 });
 
 test("destructive media operations are admin-gated and retryable", () => {
