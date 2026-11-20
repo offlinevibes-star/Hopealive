@@ -5,6 +5,7 @@ import vm from "node:vm";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const site = read("../site.js");
+const client = read("../supabase-client.js");
 const admin = read("../admin.html");
 const contact = read("../contact.html");
 const importer = read("../supabase-migrate.html");
@@ -82,4 +83,10 @@ test("admin audit trail is restricted and rate-limit cleanup is service-role onl
   assert.match(mediaMigration, /public\.is_hopealive_admin\(\)/);
   assert.match(mediaMigration, /cleanup_contact_rate_limits/);
   assert.match(mediaMigration, /to service_role/);
+});
+
+test("Supabase browser and Edge SDK dependencies are pinned to exact versions", () => {
+  assert.match(admin, /@supabase\\/supabase-js@2\\.119\\.2/);
+  assert.match(client, /@supabase\\/supabase-js@2\\.119\\.2/);
+  assert.match(edge, /@supabase\\/supabase-js@2\\.119\\.2/);
 });
