@@ -18,7 +18,7 @@ Migration 003 is additive and preserves existing media objects. It:
 - Adds a server-side contact rate-limit table/function and removes direct anonymous inserts into the contact table.
 - Consolidates overlapping post/settings read policies while retaining public published reads and allow-listed admin access.
 - Adds editable media display names and alt text without changing Storage object paths.
-- Adds an administrator-only activity log for changes to posts, media, settings and donations.
+- Adds an administrator-only activity log for administrator login/logout and changes to posts, media, settings and donations.
 - Adds a service-role-only cleanup function for expired contact rate-limit records.
 
 Do not skip migrations or run 003 before 002. Take a database backup before applying schema changes.
