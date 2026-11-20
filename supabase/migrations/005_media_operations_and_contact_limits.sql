@@ -29,6 +29,7 @@ create table if not exists public.media_cleanup_jobs (
   media_asset_id uuid references public.media_assets(id) on delete set null,
   storage_bucket text not null check (storage_bucket in ('hopealive-media', 'hopealive-private-media')),
   storage_path text not null check (length(trim(storage_path)) between 1 and 1024),
+  reference_url text,
   status text not null default 'pending'
     check (status in ('pending', 'running', 'failed', 'blocked', 'completed')),
   attempts integer not null default 0 check (attempts >= 0),
@@ -196,9 +197,9 @@ begin
   end if;
 
   insert into public.media_cleanup_jobs(
-    operation, media_asset_id, storage_bucket, storage_path, requested_by
+    operation, media_asset_id, storage_bucket, storage_path, reference_url, requested_by
   ) values (
-    'delete_asset', v_asset.id, v_asset.storage_bucket, v_asset.storage_path, auth.uid()
+    'delete_asset', v_asset.id, v_asset.storage_bucket, v_asset.storage_path, v_asset.public_url, auth.uid()
   ) returning id into v_job_id;
 
   update public.media_assets
@@ -295,9 +296,9 @@ begin
   end if;
 
   insert into public.media_cleanup_jobs(
-    operation, storage_bucket, storage_path, requested_by
+    operation, storage_bucket, storage_path, reference_url, requested_by
   ) values (
-    'delete_orphan', v_asset.storage_bucket, v_asset.storage_path, auth.uid()
+    'delete_orphan', v_asset.storage_bucket, v_asset.storage_path, v_asset.public_url, auth.uid()
   )
   on conflict (operation, storage_bucket, storage_path)
     where status in ('pending', 'running', 'failed', 'blocked')
