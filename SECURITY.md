@@ -37,5 +37,5 @@ The static GitHub Pages host does not provide arbitrary response-header configur
 - Enable leaked-password protection in Supabase Auth.
 - Keep the service-role key only in Edge Function secrets.
 - Schedule `public.cleanup_contact_rate_limits()` daily.
-- Review the administrator activity log and Supabase function logs.
+- Review the administrator activity log (sign-in/out and record changes) and Supabase function logs.
 - Treat public media as permanently discoverable even if later removed from the Gallery; use private storage for unapproved material.
