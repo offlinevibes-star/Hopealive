@@ -74,7 +74,7 @@ if(S.length)L.push(['Follow us',S.map(([k,u])=>`<a href="${u}" target="_blank" r
 set('#details',L.map(([k,v])=>`<p><b>${k}</b><br>${v}</p>`).join(''));
 const fm=$('#form');
 if(fm)fm.onsubmit=async e=>{e.preventDefault();const f=new FormData(fm),status=$('#fs');status.textContent='Sending…';const payload={sender_name:String(f.get('name')||'').trim(),sender_email:String(f.get('email')||'').trim(),message:String(f.get('msg')||'').trim()};
- if(db){try{const {error}=await db.from('contact_messages').insert(payload);if(error)throw error;fm.reset();status.textContent='Thank you. Your message has been sent.';return}catch(err){console.error('Supabase contact submission failed',err)}}
+ if(db){try{const {data,error}=await db.functions.invoke('contact-submit',{body:{...payload,website:String(f.get('website')||'')}});if(error)throw error;if(data&&data.error)throw Error(data.error);fm.reset();status.textContent='Thank you. Your message has been sent.';return}catch(err){console.error('Supabase contact submission failed',err);status.textContent=err.message||'Sorry, your message could not be sent. Please email us directly.';return}}
  if(C.formspree){try{const r=await fetch(C.formspree,{method:'POST',body:f,headers:{Accept:'application/json'}});if(!r.ok)throw 0;fm.reset();status.textContent='Thank you. Your message has been sent.'}catch(_){status.textContent='Sorry, that did not send. Please email us directly.'}return}
  status.textContent='Sorry, the message could not be sent. Please email us directly.';
 };
