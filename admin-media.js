@@ -287,7 +287,7 @@ async function hopeLoadMediaPage() {
         }
         await hopeLoadMediaPage();
       } catch (error) {
-        say("Could not save media details: " + (error?.message || String(error)));
+        say("Media metadata was saved where indicated, but the visibility or follow-up operation failed: " + (error?.message || String(error)));
         button.disabled = false;
       }
     };
@@ -315,20 +315,27 @@ function hopeRenderMediaReport() {
   const report = hopeMediaState.report;
   if (!target || !report) return;
   const orphans = Array.isArray(report.orphaned_objects) ? report.orphaned_objects : [];
+  const referenced = Array.isArray(report.referenced_unregistered_objects) ? report.referenced_unregistered_objects : [];
   const broken = Array.isArray(report.broken_records) ? report.broken_records : [];
   target.innerHTML =
     '<h4>Storage integrity report</h4><p class="muted">Checked ' + esc(new Date(report.checked_at).toLocaleString()) +
-    ' · ' + orphans.length + ' unregistered object(s) · ' + broken.length + ' media record(s) with missing objects. This scan does not delete anything.</p>' +
+    ' · ' + orphans.length + ' unreferenced/unregistered object(s) · ' + referenced.length + ' referenced/unregistered object(s) · ' + broken.length + ' broken media record(s). This scan does not delete anything.</p>' +
     (orphans.length
       ? '<h5>Unregistered Storage objects</h5>' + orphans.map((item, index) =>
         '<div class="item"><span>' + esc(item.bucket) + ' / ' + esc(item.path) + '</span> ' +
         '<button type="button" class="b danger" data-queue-orphan="' + index + '">Queue deletion</button></div>'
       ).join("")
-      : '<p class="muted">No orphaned Storage objects detected.</p>') +
+      : '<p class="muted">No unreferenced orphaned Storage objects detected.</p>') +
+    (referenced.length
+      ? '<h5>Unregistered but referenced Storage objects</h5><p class="muted">These objects may still be used by posts or public settings. They are excluded from cleanup until the references are reviewed.</p>' +
+        referenced.map((item) => '<div class="item">' + esc(item.bucket) + ' / ' + esc(item.path) + '</div>').join("")
+      : '<p class="muted">No referenced, unregistered Storage objects detected.</p>') +
     (broken.length
       ? '<h5>Media records with missing Storage objects</h5>' + broken.map((item, index) =>
         '<div class="item"><span>' + esc(item.display_name || item.path) + ' · ' + esc(item.bucket) + ' / ' + esc(item.path) + '</span> ' +
-        '<button type="button" class="b danger" data-remove-broken="' + index + '">Remove broken record</button></div>'
+        (item.is_referenced
+          ? '<span class="muted">Referenced by content — not eligible for removal</span>'
+          : '<button type="button" class="b danger" data-remove-broken="' + index + '">Remove broken record</button>') + '</div>'
       ).join("")
       : '<p class="muted">No broken media records detected.</p>');
 
