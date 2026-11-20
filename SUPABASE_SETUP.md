@@ -97,7 +97,7 @@ Published post HTML is sanitized with DOMPurify before it is rendered. If the sa
 
 1. Enable the strongest database backup/PITR option available for the Supabase plan and periodically test a restore.
 2. Merge the GitHub pull request only after the GitHub Actions static smoke tests pass.
-3. Apply migration 003 and deploy the Edge Function before publishing the new frontend. This order prevents the new contact form from calling an undeployed function.
+3. Apply migrations 003 and 004 and deploy the Edge Function before publishing the new frontend. This order prevents the new contact form from calling an undeployed function.
 4. Configure Turnstile and leaked-password protection before public launch.
 5. Test on desktop and mobile:
    - Public pages and published posts load; drafts stay hidden.
