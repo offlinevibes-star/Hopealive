@@ -18,6 +18,7 @@ const mediaOperations = read("../supabase/functions/admin-media/index.ts");
 const operationsMigration = read("../supabase/migrations/005_media_operations_and_contact_limits.sql");
 const auditMigration = read("../supabase/migrations/004_media_metadata_audit.sql");
 const claimMigration = read("../supabase/migrations/007_atomic_media_cleanup_claim.sql");
+const referenceLockMigration = read("../supabase/migrations/008_atomic_media_reference_lock.sql");
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
@@ -96,7 +97,6 @@ test("admin audit trail is restricted and rate-limit cleanup is service-role onl
   assert.match(mediaMigration, /to service_role/);
 });
 
-
 test("media operations use paginated queries and page-scoped private previews", () => {
   assert.match(adminMedia, /select\("\*", \{ count: "exact" \}\)/);
   assert.match(adminMedia, /\.range\(first, first \+ hopeMediaState\.pageSize - 1\)/);
@@ -158,10 +158,18 @@ test("Supabase browser and Edge SDK dependencies are pinned to exact versions", 
   assert.ok(edge.includes("@supabase/supabase-js@2.119.2"));
 });
 
-
 test("media cleanup jobs use atomic service-role-only claims", () => {
   assert.match(mediaOperations, /claim_media_cleanup_job/);
   assert.match(claimMigration, /status = 'running' and updated_at < p_stale_before/i);
   assert.match(claimMigration, /revoke all on function public\.claim_media_cleanup_job[\s\S]*from public, anon, authenticated/i);
   assert.match(claimMigration, /grant execute on function public\.claim_media_cleanup_job[\s\S]*to service_role/i);
+});
+
+test("media reference writes and cleanup requests share a transaction-scoped advisory lock", () => {
+  assert.match(referenceLockMigration, /pg_advisory_xact_lock_shared\(1479618616, 1\)/);
+  assert.match(referenceLockMigration, /pg_advisory_xact_lock\(1479618616, 1\)/);
+  assert.match(referenceLockMigration, /enqueue_media_asset_delete[\s\S]*perform pg_advisory_xact_lock\(1479618616, 1\)[\s\S]*hopealive_media_content_references/);
+  assert.match(referenceLockMigration, /enqueue_media_orphan_delete[\s\S]*perform pg_advisory_xact_lock\(1479618616, 1\)[\s\S]*hopealive_media_content_references/);
+  assert.match(referenceLockMigration, /set_media_asset_visibility[\s\S]*perform pg_advisory_xact_lock\(1479618616, 1\)[\s\S]*hopealive_media_content_references/);
+  assert.match(referenceLockMigration, /v_asset\.delete_pending/);
 });
