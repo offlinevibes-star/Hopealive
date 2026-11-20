@@ -12,7 +12,7 @@ const migration = read("../supabase/migrations/003_security_reliability.sql");
 const edge = read("../supabase/functions/contact-submit/index.ts");
 
 function inlineScripts(html) {
-  return [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)]
+  return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
     .map((match) => match[1]).filter((script) => script.trim());
 }
 
@@ -29,8 +29,8 @@ test("migration tool inline JavaScript parses", () => {
 });
 
 test("public contact form submits only through the rate-limited function", () => {
-  assert.match(site, /functions\\.invoke\\('contact-submit'/);
-  assert.doesNotMatch(site, /from\\('contact_messages'\\)\\.insert/);
+  assert.match(site, /functions\.invoke\('contact-submit'/);
+  assert.doesNotMatch(site, /from\('contact_messages'\)\.insert/);
   assert.match(contact, /name="website"/);
   assert.match(edge, /consume_contact_rate_limit/);
   assert.match(edge, /429/);
@@ -38,8 +38,8 @@ test("public contact form submits only through the rate-limited function", () =>
 
 test("unpublished media and draft post attachments use the private bucket", () => {
   assert.match(migration, /hopealive-private-media/);
-  assert.match(admin, /published\\?MEDIA_BUCKET:PRIVATE_MEDIA_BUCKET/);
-  assert.match(admin, /draft\\?PRIVATE_MEDIA_BUCKET:MEDIA_BUCKET/);
+  assert.match(admin, /published\?MEDIA_BUCKET:PRIVATE_MEDIA_BUCKET/);
+  assert.match(admin, /draft\?PRIVATE_MEDIA_BUCKET:MEDIA_BUCKET/);
   assert.match(admin, /createSignedUrl/);
 });
 
