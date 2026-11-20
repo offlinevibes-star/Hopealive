@@ -121,6 +121,9 @@ test("destructive media operations are admin-gated and retryable", () => {
   assert.match(operationsMigration, /delete_pending/);
   assert.match(operationsMigration, /hopealive_media_content_references/);
   assert.match(operationsMigration, /get_media_integrity_report/);
+  assert.match(operationsMigration, /prevent_referencing_pending_media/);
+  assert.match(operationsMigration, /prevent_pending_media_reference_on_posts/);
+  assert.match(operationsMigration, /prevent_pending_media_reference_on_settings/);
 });
 
 test("contact validation and layered limits use hashed global, email and optional IP keys", () => {
