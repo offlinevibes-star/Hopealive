@@ -18,7 +18,7 @@ Open `yoursite/admin.html` and sign in with the invited, allow-listed Supabase a
 - **Settings:** manage the hero image, trustees, contact details, social links, donation details and other site settings.
 - **Messages and Donations:** manage website enquiries and donation records.
 
-The browser uploader accepts images and videos up to 50 MB per file. Public visitors can view published media; only allow-listed administrators can upload, list, edit or delete files. Keep the Supabase service-role key and database password private. Never put either in website code.
+The browser uploader accepts images and videos up to 50 MB per file. Public visitors can view published media; only allow-listed administrators can upload, list, edit or delete files. The bucket is public by URL: hiding an item from the Gallery does not make its direct URL private. Obtain appropriate consent before publishing identifiable people, especially children. Keep the Supabase service-role key and database password private. Never put either in website code.
 
 ## Optional comments
 Enable GitHub Discussions, obtain the Giscus configuration at giscus.app, and enter the values in Admin > Settings.
