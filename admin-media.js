@@ -40,8 +40,8 @@ async function hopeCleanupDetachedObject(bucket, path) {
 function hopeMediaCard(m) {
   const preview = m.display_url
     ? (m.media_type === "video"
-      ? '<video class="media-preview" controls preload="none" src="' + esc(m.display_url) + '"></video>'
-      : '<img class="media-preview" loading="lazy" src="' + esc(m.display_url) + '" alt="' + esc(m.alt_text || m.display_name || m.filename) + '">')
+      ? '<video class="media-preview" data-media-preview="true" controls preload="none" src="' + esc(m.display_url) + '"></video>'
+      : '<img class="media-preview" data-media-preview="true" loading="lazy" src="' + esc(m.display_url) + '" alt="' + esc(m.alt_text || m.display_name || m.filename) + '">')
     : '<div class="media-preview" role="img" aria-label="Preview unavailable" style="display:grid;place-items:center">Preview unavailable</div>';
   const pending = m.delete_pending === true;
   return '<article class="media-card" data-media-card="' + esc(m.id) + '">' +
@@ -264,6 +264,15 @@ async function hopeLoadMediaPage() {
   grid.innerHTML = visible.length
     ? visible.map(hopeMediaCard).join("")
     : '<p class="muted">No media matches these filters.</p>';
+  grid.querySelectorAll("[data-media-preview]").forEach((preview) => {
+    preview.addEventListener("error", () => {
+      const fallback = document.createElement("div");
+      fallback.className = "media-preview";
+      fallback.setAttribute("role", "img");
+      fallback.textContent = "Preview unavailable";
+      preview.replaceWith(fallback);
+    }, { once: true });
+  });
   const pageCount = Math.max(1, Math.ceil(hopeMediaState.count / hopeMediaState.pageSize));
   $("#media-page-label").textContent = "Page " + (hopeMediaState.page + 1) + " of " + pageCount;
   $("#media-prev").disabled = hopeMediaState.page === 0;
