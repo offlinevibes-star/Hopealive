@@ -57,8 +57,9 @@ async function removeObjectIdempotently(admin: ReturnType<typeof createClient>, 
   if (error && await objectExists(admin, bucket, path)) throw error;
 }
 
-async function contentIsReferenced(admin: ReturnType<typeof createClient>, path: string, publicUrl: string | null) {
+async function contentIsReferenced(admin: ReturnType<typeof createClient>, bucket: string, path: string, publicUrl: string | null) {
   const { data, error } = await admin.rpc("hopealive_media_content_references", {
+    p_storage_bucket: bucket,
     p_storage_path: path,
     p_public_url: publicUrl,
   });
@@ -82,7 +83,7 @@ async function processJob(admin: ReturnType<typeof createClient>, jobId: string)
   if (claimError) throw claimError;
 
   try {
-    if (await contentIsReferenced(admin, job.storage_path, job.reference_url || null)) {
+    if (await contentIsReferenced(admin, job.storage_bucket, job.storage_path, job.reference_url || null)) {
       const message = "The Storage path is now referenced by a post or public setting; cleanup was blocked.";
       await admin.from("media_cleanup_jobs").update({
         status: "blocked", last_error: message, updated_at: new Date().toISOString(),
@@ -255,7 +256,7 @@ Deno.serve(async (req: Request) => {
     const targetBucket = body.is_published ? PUBLIC_BUCKET : PRIVATE_BUCKET;
     if (sourceBucket === targetBucket) return json({ ok: true, moved: false, message: "Visibility is unchanged." });
 
-    if (await contentIsReferenced(admin, asset.storage_path, asset.public_url)) {
+    if (await contentIsReferenced(admin, sourceBucket, asset.storage_path, asset.public_url)) {
       return json({ ok: false, message: "This media file is referenced by a post or public setting. Update those references before changing visibility." });
     }
     const { data: blob, error: downloadError } = await admin.storage.from(sourceBucket).download(asset.storage_path);
