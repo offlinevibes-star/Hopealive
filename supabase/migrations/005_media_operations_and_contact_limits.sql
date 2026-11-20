@@ -82,7 +82,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select
     exists (
       select 1
@@ -105,7 +105,7 @@ as $
       where s.settings::text ilike '%' || p_storage_path || '%'
          or (p_public_url is not null and s.settings::text ilike '%' || p_public_url || '%')
     );
-$;
+$$;
 revoke all on function public.hopealive_media_content_references(text, text, text) from public, anon, authenticated;
 grant execute on function public.hopealive_media_content_references(text, text, text) to service_role;
 
