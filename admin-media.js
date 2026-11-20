@@ -26,7 +26,12 @@ function hopeMediaValidateText(value, max, field) {
 async function hopeMediaAction(payload) {
   const { data, error } = await db.functions.invoke("admin-media", { body: payload });
   if (error) throw error;
-  if (!data || data.ok !== true) throw new Error(data?.message || "Media operation failed.");
+  if (!data) throw new Error("Media operation returned an empty response.");
+  if (data.ok !== true) {
+    const failure = new Error(data.message || "Media operation did not complete.");
+    failure.data = data;
+    throw failure;
+  }
   return data;
 }
 async function hopeCleanupDetachedObject(bucket, path) {
@@ -294,8 +299,13 @@ async function hopeLoadMediaPage() {
         }
         await hopeLoadMediaPage();
       } catch (error) {
-        say("Media metadata was saved where indicated, but the visibility or follow-up operation failed: " + (error?.message || String(error)));
-        button.disabled = false;
+        if (error?.data?.moved) {
+          say(error.data.message + " Media details and visibility were saved; retry cleanup to remove the old object.");
+          await hopeLoadMediaPage();
+        } else {
+          say("Media metadata was saved, but Gallery visibility was not changed: " + (error?.message || String(error)));
+          button.disabled = false;
+        }
       }
     };
   });
@@ -309,8 +319,9 @@ async function hopeLoadMediaPage() {
         say(result.message || "Media deleted.");
         await hopeLoadMediaPage();
       } catch (error) {
-        say("Media was not deleted: " + (error?.message || String(error)));
+        say("Deletion did not fully complete or was blocked. Check the cleanup queue and retry after resolving any references: " + (error?.message || String(error)));
         button.disabled = false;
+        await hopeLoadMediaPage();
       }
     };
   });
