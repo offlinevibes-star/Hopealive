@@ -61,6 +61,7 @@ test("media display names and alt text are editable without changing Storage pat
   assert.match(mediaMigration, /add column if not exists alt_text text/);
   assert.match(admin, /data-mdname/);
   assert.match(admin, /data-malt/);
+  assert.match(admin, /createSignedUrl\(m\.storage_path,300\)/);
   assert.match(admin, /display_name:/);
   assert.match(admin, /alt_text:/);
   assert.match(admin, /Storage filename renaming is deliberately disabled/);
