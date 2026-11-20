@@ -16,6 +16,12 @@ on conflict (id) do update set
   file_size_limit = excluded.file_size_limit,
   allowed_mime_types = excluded.allowed_mime_types;
 
+-- Restrict future public-bucket uploads to formats approved by the admin UI.
+-- Existing public objects remain accessible and are not modified.
+update storage.buckets
+set allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm','video/quicktime']
+where id = 'hopealive-media';
+
 alter table public.media_assets add column if not exists storage_bucket text not null default 'hopealive-media';
 alter table public.media_assets alter column public_url drop not null;
 alter table public.media_assets add constraint media_assets_storage_bucket_check
