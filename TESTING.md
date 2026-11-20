@@ -9,7 +9,7 @@ node --check site.js
 node --test tests/*.test.mjs
 ~~~
 
-The suite parses the public site, admin inline scripts and media manager; checks security-sensitive wiring and direct Storage-delete restrictions; and exercises pure contact input normalization/IP validation. The RLS and browser suites are opt-in and will be skipped unless their test-only credentials, safety confirmation and optional dependencies are present. It does not prove Supabase RLS, Storage permissions, Turnstile, Edge Function ingress headers, real media operations, or browser workflows.
+The suite parses the public site, admin inline scripts and media manager; checks security-sensitive wiring, direct Storage-delete restrictions and advisory-lock SQL wiring; and exercises pure contact input normalization/IP validation. The RLS and browser suites are opt-in and will be skipped unless their test-only credentials, safety confirmation and optional dependencies are present. It does not prove Supabase RLS, Storage permissions, Turnstile, Edge Function ingress headers, real media operations, or browser workflows.
 
 ## Isolated Supabase integration checks still required
 
@@ -21,8 +21,8 @@ Verify:
 3. A signed-in non-admin cannot insert/update/delete posts or media, access admin activity or change Storage objects.
 4. The allow-listed admin can perform permitted CMS and media operations.
 5. Private media signed URLs are issued only to admins and expire.
-6. The cleanup queue handles successful deletion, Storage failure, metadata failure, retries, stale-running jobs and repeated requests. Concurrent workers cannot claim the same fresh job; stale running jobs become reclaimable after the retry timeout.
-7. Media in use by a published or draft post or public setting cannot be deleted or moved between buckets.
+6. The cleanup queue handles successful deletion, Storage failure, metadata failure, retries, stale-running jobs and repeated requests. Concurrent workers cannot claim the same fresh job; stale running jobs become reclaimable after the retry timeout. Concurrent content-reference writes and delete/visibility requests must serialize through the shared/exclusive advisory lock so a referenced object is never removed.
+7. Media in use by a published or draft post or public setting cannot be deleted or moved between buckets. Exercise a concurrent post/site-setting reference write against delete and visibility requests in separate transactions.
 8. Orphaned objects, referenced-but-unregistered objects and broken database records are correctly distinguished.
 9. Contact requests reject malformed JSON, oversized bodies, invalid fields, honeypot, missing/invalid/expired Turnstile, repeated email, repeated IP, global limit and rate-limit database failure.
 10. For IP controls, prove the hosted ingress overwrites a forged client cf-connecting-ip header before setting TRUST_CF_CONNECTING_IP=true.
