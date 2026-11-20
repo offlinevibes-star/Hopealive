@@ -1,45 +1,104 @@
-# HopeAlive Supabase CMS setup
+# HopeAlive Supabase production setup
 
-This repository is a static GitHub Pages site. Supabase will provide authentication and the private database; the browser will use only the Supabase project URL and publishable/anon key. **Never put the service_role key in website files.**
+The public website is hosted as a static GitHub Pages site. The browser uses only the Supabase project URL and publishable key. **Never place the database password, service-role key, or other server secrets in website files or `site_settings`.**
 
-## 1. Create the Supabase project
-1. Create a project at https://supabase.com/dashboard.
-2. Choose a strong database password and keep it somewhere private.
-3. In Project Settings → API, copy the Project URL and publishable key (or legacy anon key). These are intended for browser use when Row Level Security is enabled.
-4. In SQL Editor, run `supabase/migrations/001_hopealive_cms.sql`, then run `supabase/migrations/002_media_library.sql`. The second migration creates the public `hopealive-media` bucket (50 MB per file), the media library metadata table, post attachments, and policies that restrict upload/update/delete to approved administrators.
+## Apply the database migrations
 
-## 2. Create the first administrator
-1. In Authentication → Users, invite the administrator's email address.
-2. Confirm the user has signed in/accepted the invitation.
-3. Copy that user's UUID from Authentication → Users.
-4. In SQL Editor run this statement, replacing the placeholder with that exact UUID:
+Run these migrations in order in the HopeAlive Supabase project's SQL Editor:
 
-```sql
-insert into public.admin_users (user_id)
-values ('PASTE-ADMIN-USER-UUID-HERE');
+1. `supabase/migrations/001_hopealive_cms.sql`
+2. `supabase/migrations/002_media_library.sql`
+3. `supabase/migrations/003_security_reliability.sql`
+
+Migration 003 is additive and preserves existing media objects. It:
+- Adds a stable source key to legacy donation imports so repeat imports upsert instead of creating duplicates.
+- Creates a private media bucket for unpublished gallery items and draft-post attachments.
+- Keeps the existing public bucket for approved/published website media and restricts future uploads to approved raster/video MIME types.
+- Adds a server-side contact rate-limit table/function and removes direct anonymous inserts into the contact table.
+- Consolidates overlapping post/settings read policies while retaining public published reads and allow-listed admin access.
+
+Do not skip migrations or run 003 before 002. Take a database backup before applying schema changes.
+
+## Administrator access
+
+1. In Supabase Authentication → Users, invite each administrator.
+2. Add each invited user's exact Auth UUID to `public.admin_users`.
+3. Do not enable public administrator sign-ups.
+4. In Authentication settings, enable **Leaked password protection** (Have I Been Pwned checks) and set a suitable minimum password length.
+5. Restrict allowed redirect URLs to the production site, including:
+   `https://offlinevibes-star.github.io/Hopealive/**`
+6. Test sign-in, password recovery, sign-out, and removal from the admin allow-list.
+
+The database advisor may report `admin_users` as RLS-enabled without policies. That is intentional: browser roles must not enumerate the allow-list. The `is_hopealive_admin()` SECURITY DEFINER RPC is intentionally executable by authenticated users so the dashboard can check its own authorization; it returns only a boolean.
+
+## Expose the Data API schema
+
+In Project Settings → API (or the project's Data API settings), confirm that `public` is included in the exposed schemas. The site calls the Supabase Data API for `posts`, `site_settings`, `media_assets`, and admin-only tables. SQL grants and RLS policies alone do not expose a schema through PostgREST.
+
+Keep RLS enabled and test both anonymous and administrator access after changing exposure settings.
+
+## Deploy the contact Edge Function
+
+The public contact form now calls `contact-submit`; it no longer inserts directly into `contact_messages`.
+
+From the repository root, after migration 003 has been applied:
+
+```sh
+supabase functions deploy contact-submit --no-verify-jwt
 ```
 
-Only UUIDs explicitly added to `admin_users` can administer content or read private messages. Do not create a public sign-up flow for administrators.
+This endpoint intentionally does not require a Supabase user JWT because visitors are anonymous. The function validates the request, applies a limit of five submissions per IP hash per 15 minutes, uses a honeypot, and inserts through the server-side service role. The service-role key must remain in Supabase's function environment only.
 
-## 3. Send the connection details
-Send the Project URL and publishable/anon key in this chat when ready. These are public client configuration values, not passwords. **Do not send the database password or service_role/secret key.**
+The function allows the GitHub Pages origin `https://offlinevibes-star.github.io`. If the site uses a custom domain, update the function's CORS/origin allow-list before deployment.
 
-I can then wire the existing HopeAlive pages to Supabase, migrate the current posts/settings, replace the GitHub-token login with Supabase Auth, and add the private inbox.
+### Turnstile (recommended)
 
-## Tables and access
-- `posts`: public visitors can read published posts; administrators manage all posts.
-- `site_settings`: public site settings are readable; only administrators can change them.
-- `donations`: administrator-only.
-- `contact_messages`: visitors can submit; only allow-listed administrators can read/update/delete.
-- `admin_users`: protected allow-list used by the database authorization function.
-- `media_assets`: public visitors can read published media metadata; only allow-listed administrators can manage it. File objects are served from the public `hopealive-media` bucket, while RLS restricts uploads and mutations.
+The function supports Cloudflare Turnstile when configured:
 
-## Important production notes
-- The public contact insert policy validates lengths but is not a full anti-spam/rate-limit system. Before launch, add CAPTCHA/Turnstile and a server-side rate-limited Edge Function.
-- Restrict Auth redirect URLs to the HopeAlive GitHub Pages origin and disable public sign-ups after inviting the administrator.
-- The database backup is separate from GitHub repository backups. Keep periodic Supabase database backups.
-- The initial migration creates the secure CMS backend. The second migration enables media uploads. The website code is configured to display published gallery media and post attachments after both migrations have been run.
+1. Create a Turnstile widget for the production site hostname in Cloudflare.
+2. Put the **site key** in the public website settings JSON as `"turnstileSiteKey": "YOUR_SITE_KEY"`.
+3. Store the **secret key** as a Supabase Edge Function secret, never in the website:
+   ```sh
+   supabase secrets set TURNSTILE_SECRET_KEY=YOUR_SECRET_KEY
+   ```
+4. Redeploy `contact-submit` and test valid, missing, and invalid challenges.
 
-## Media uploads
+Until both keys are configured, the honeypot and server-side rate limit remain active, but Turnstile verification is not enforced.
 
-Open `admin.html` and sign in as an allow-listed administrator. Use **Media library** to upload multiple images or short videos, choose a category (or use filename-based suggestions), add captions, and publish them in the public Gallery. When creating or editing a post, use **Photos and videos in this post** to attach media directly to that post. The browser uploader accepts images and MP4, WebM, or MOV videos up to 50 MB each. Storage files are publicly viewable by URL; only allow-listed administrators can upload, edit, list, or delete files. Hiding an item from the Gallery only removes its listing; it does not make its URL private. Obtain appropriate consent before publishing identifiable people, especially children.
+## Media privacy and consent
+
+- The `hopealive-media` bucket remains public for media intentionally published on the public website.
+- The new `hopealive-private-media` bucket is private. New unpublished Gallery media and draft-post attachments go there and are shown to administrators through short-lived signed URLs.
+- Publishing copies the asset to the public bucket; unpublishing moves it back to private storage.
+- Existing published assets are not moved by migration 003. The current project had 94 media rows, all marked published, and 94 objects in the public bucket at the time of review.
+- If older draft posts already have attachments in the public bucket, edit and save each draft once to move those attachments to private storage.
+- Obtain and retain appropriate consent before publishing identifiable people, especially children. A public object URL is accessible to anyone who has it.
+
+## Donation import
+
+Run the legacy import from the admin dashboard only after migration 003. Posts and settings are upserted. Donations now receive deterministic `source_key` values and are upserted by that key, so rerunning the same import will not duplicate those imported rows. Manually entered donations are not overwritten.
+
+If an earlier version of the importer was run before source keys existed, reconcile any old imported donation rows manually before re-importing them; the new key cannot automatically identify historical duplicates.
+
+## Public website settings
+
+Every value in `site_settings.settings` is public. Only store verified public contact details, approved images, public social links, donation instructions, and other content intended for visitors. Never store private staff details, passwords, payment-provider secrets, service-role keys, or other credentials there. The admin editor now validates the top-level settings keys and displays this warning.
+
+Published post HTML is sanitized with DOMPurify before it is rendered. If the sanitizer CDN cannot load, the post body is rendered as escaped text rather than trusted raw HTML.
+
+## Backups, tests, and rollout
+
+1. Enable the strongest database backup/PITR option available for the Supabase plan and periodically test a restore.
+2. Merge the GitHub pull request only after the GitHub Actions static smoke tests pass.
+3. Apply migration 003 and deploy the Edge Function before publishing the new frontend. This order prevents the new contact form from calling an undeployed function.
+4. Configure Turnstile and leaked-password protection before public launch.
+5. Test on desktop and mobile:
+   - Public pages and published posts load; drafts stay hidden.
+   - Draft media previews work only for signed-in admins.
+   - Publishing/unpublishing media copies between buckets and updates metadata.
+   - Contact form success, validation, honeypot, rate-limit (sixth request), and Turnstile.
+   - Donation import can be run twice without increasing imported donation count.
+   - Admin CRUD, session expiry, password recovery, and unauthorized accounts.
+6. Review Supabase security/performance advisors after migration and monitor Edge Function/Postgres logs.
+
+The GitHub Actions tests are static syntax/security smoke checks; they do not replace browser, end-to-end, permission, or restore testing.
