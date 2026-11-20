@@ -15,14 +15,17 @@ Use Supabase CLI in a trusted workstation or the Supabase SQL Editor, reviewing 
 3. supabase/migrations/003_security_reliability.sql
 4. supabase/migrations/004_media_metadata_audit.sql
 5. supabase/migrations/005_media_operations_and_contact_limits.sql
+6. supabase/migrations/006_policy_and_index_cleanup.sql
 
 Migration 004's administrator auth-event function uses corrected PostgreSQL dollar-quoting in this branch. Migration 005 is additive and:
 - Adds media display-name, alt-text and pending-deletion metadata where absent, and creates media search/pagination indexes.
 - Creates a private cleanup queue with retry status, attempt count and error details.
 - Restricts direct browser deletion of media metadata; destructive cleanup is performed by the server-side media function.
 - Adds administrator-only media integrity reporting, reference-aware delete requests and orphan cleanup requests.
-- Replaces the posts read policy that used deprecated auth.role() with distinct public-published and admin-read policies.
+- Replaces the posts read policy that used deprecated auth.role() with separate anonymous-published and authenticated-published/admin policies.
 - Adds global, email and optional trusted-IP rate-limit keys using a service-role-only function.
+
+Migration 006 makes is_hopealive_admin() a SECURITY INVOKER helper backed by an RLS policy that lets an authenticated user read only their own admin allow-list row. It adds explicit deny policies for internal rate-limit/cleanup tables, consolidates post SELECT policies by role, and indexes the audit/cleanup foreign keys.
 
 Do not re-run older migrations blindly. Confirm which versions have already been applied and inspect any SQL Editor-only changes before selecting the next migration. Take a backup before DDL changes.
 
@@ -35,11 +38,11 @@ Do not re-run older migrations blindly. Confirm which versions have already been
 5. Restrict Auth redirect URLs to the production site, including https://offlinevibes-star.github.io/Hopealive/**.
 6. Test an allow-listed admin, a signed-in non-admin and an anonymous visitor in the isolated environment.
 
-The allow-list has RLS enabled and intentionally no browser policy. The boolean is_hopealive_admin() RPC is callable by authenticated users so the dashboard and Edge Functions can check the current user's allow-list membership; it returns only a boolean.
+The allow-list has RLS enabled. An authenticated user can read only their own membership row; the function is_hopealive_admin() uses invoker rights and returns only whether the current signed-in user is allow-listed. Do not grant browser roles insert, update or delete access to the allow-list.
 
 ## Deploy Edge Functions
 
-After migrations 001–005 are applied in the target environment:
+After migrations 001–006 are applied in the target environment:
 
 ~~~sh
 supabase functions deploy contact-submit --no-verify-jwt
