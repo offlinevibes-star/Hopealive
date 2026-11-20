@@ -17,6 +17,7 @@ const adminMedia = read("../admin-media.js");
 const mediaOperations = read("../supabase/functions/admin-media/index.ts");
 const operationsMigration = read("../supabase/migrations/005_media_operations_and_contact_limits.sql");
 const auditMigration = read("../supabase/migrations/004_media_metadata_audit.sql");
+const claimMigration = read("../supabase/migrations/007_atomic_media_cleanup_claim.sql");
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
@@ -155,4 +156,12 @@ test("Supabase browser and Edge SDK dependencies are pinned to exact versions", 
   assert.ok(admin.includes("@supabase/supabase-js@2.119.2"));
   assert.ok(client.includes("@supabase/supabase-js@2.119.2"));
   assert.ok(edge.includes("@supabase/supabase-js@2.119.2"));
+});
+
+
+test("media cleanup jobs use atomic service-role-only claims", () => {
+  assert.match(mediaOperations, /claim_media_cleanup_job/);
+  assert.match(claimMigration, /status = 'running' and updated_at < p_stale_before/i);
+  assert.match(claimMigration, /revoke all on function public\\.claim_media_cleanup_job[\\s\\S]*from public, anon, authenticated/i);
+  assert.match(claimMigration, /grant execute on function public\\.claim_media_cleanup_job[\\s\\S]*to service_role/i);
 });
