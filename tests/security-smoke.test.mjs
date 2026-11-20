@@ -131,7 +131,7 @@ test("contact validation and layered limits use hashed global, email and optiona
   assert.match(edge, /isValidIp/);
   assert.match(edgeValidation, /normalizeContactPayload/);
   assert.match(edgeValidation, /isValidIp/);
-  assert.doesNotMatch(edge, /req\\.headers\\.get\\(["'](?:x-forwarded-for|x-real-ip)["']\\)/i);
+  assert.doesNotMatch(edge, /req\.headers\.get\(["'](?:x-forwarded-for|x-real-ip)["']\)/i);
 });
 
 test("admin logout does not await audit logging before clearing local session", () => {
