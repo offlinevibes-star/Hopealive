@@ -29,6 +29,9 @@ async function hopeMediaAction(payload) {
   if (!data || data.ok !== true) throw new Error(data?.message || "Media operation failed.");
   return data;
 }
+async function hopeCleanupDetachedObject(bucket, path) {
+  return hopeMediaAction({ action: "queue_orphan_delete", bucket, path });
+}
 function hopeMediaCard(m) {
   const preview = m.display_url
     ? (m.media_type === "video"
@@ -153,8 +156,12 @@ async function loadMedia() {
           progress.textContent = "Uploaded " + complete + " of " + files.length + ": " + file.name;
         } catch (error) {
           if (asset) {
-            const { error: cleanupError } = await db.storage.from(asset.bucket).remove([asset.path]);
-            if (cleanupError) progress.textContent = "Upload failed and the temporary Storage object could not be removed. Run an integrity scan. " + error.message;
+            try {
+              await hopeCleanupDetachedObject(asset.bucket, asset.path);
+            } catch (cleanupError) {
+              progress.textContent = "Upload failed and cleanup is pending. Run an integrity scan or retry cleanup. " +
+                (cleanupError?.message || String(cleanupError));
+            }
           }
           throw error;
         }
