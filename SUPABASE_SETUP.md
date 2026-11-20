@@ -9,6 +9,7 @@ Run these migrations in order in the HopeAlive Supabase project's SQL Editor:
 1. `supabase/migrations/001_hopealive_cms.sql`
 2. `supabase/migrations/002_media_library.sql`
 3. `supabase/migrations/003_security_reliability.sql`
+4. `supabase/migrations/004_media_metadata_audit.sql`
 
 Migration 003 is additive and preserves existing media objects. It:
 - Adds a stable source key to legacy donation imports so repeat imports upsert instead of creating duplicates.
@@ -16,6 +17,9 @@ Migration 003 is additive and preserves existing media objects. It:
 - Keeps the existing public bucket for approved/published website media and restricts future uploads to approved raster/video MIME types.
 - Adds a server-side contact rate-limit table/function and removes direct anonymous inserts into the contact table.
 - Consolidates overlapping post/settings read policies while retaining public published reads and allow-listed admin access.
+- Adds editable media display names and alt text without changing Storage object paths.
+- Adds an administrator-only activity log for changes to posts, media, settings and donations.
+- Adds a service-role-only cleanup function for expired contact rate-limit records.
 
 Do not skip migrations or run 003 before 002. Take a database backup before applying schema changes.
 
@@ -41,17 +45,17 @@ Keep RLS enabled and test both anonymous and administrator access after changing
 
 The public contact form now calls `contact-submit`; it no longer inserts directly into `contact_messages`.
 
-From the repository root, after migration 003 has been applied:
+From the repository root, after migrations 003 and 004 have been applied:
 
 ```sh
 supabase functions deploy contact-submit --no-verify-jwt
 ```
 
-This endpoint intentionally does not require a Supabase user JWT because visitors are anonymous. The function validates the request, applies a limit of five submissions per IP hash per 15 minutes, uses a honeypot, and inserts through the server-side service role. The service-role key must remain in Supabase's function environment only.
+This endpoint intentionally does not require a Supabase user JWT because visitors are anonymous. The function validates the actual streamed request body (12 KB maximum), applies five-per-15-minute email-hash limits, and optionally adds IP-hash limits only when a trusted Cloudflare proxy is explicitly configured. It uses a honeypot and inserts through the server-side service role. The service-role key must remain in Supabase's function environment only.
 
 The function allows the GitHub Pages origin `https://offlinevibes-star.github.io`. If the site uses a custom domain, update the function's CORS/origin allow-list before deployment.
 
-### Turnstile (recommended)
+### Turnstile (required in production)
 
 The function supports Cloudflare Turnstile when configured:
 
@@ -61,9 +65,12 @@ The function supports Cloudflare Turnstile when configured:
    ```sh
    supabase secrets set TURNSTILE_SECRET_KEY=YOUR_SECRET_KEY
    ```
-4. Redeploy `contact-submit` and test valid, missing, and invalid challenges.
+4. Set a strong random `RATE_LIMIT_SALT` as an Edge Function secret. It is required to hash email/IP identifiers:
+   `supabase secrets set RATE_LIMIT_SALT=YOUR_RANDOM_SECRET`
+5. Optionally set `CONTACT_ALLOWED_ORIGIN` for a custom website origin and `TURNSTILE_ALLOWED_HOSTNAMES` to a comma-separated hostname allow-list.
+6. Redeploy `contact-submit` and test valid, missing, invalid and expired challenges.
 
-Until both keys are configured, the honeypot and server-side rate limit remain active, but Turnstile verification is not enforced.
+Production fails closed when `TURNSTILE_SECRET_KEY` is absent. The only bypass is an explicitly configured local environment with `APP_ENV=development`; never set that value in production. The public site key belongs in the public `turnstileSiteKey` setting; the secret never belongs in frontend code.
 
 ## Media privacy and consent
 
@@ -102,3 +109,7 @@ Published post HTML is sanitized with DOMPurify before it is rendered. If the sa
 6. Review Supabase security/performance advisors after migration and monitor Edge Function/Postgres logs.
 
 The GitHub Actions tests are static syntax/security smoke checks; they do not replace browser, end-to-end, permission, or restore testing.
+
+### Rate-limit cleanup
+
+Migration 004 creates `public.cleanup_contact_rate_limits()`, which deletes hashed identifiers not updated for 24 hours. Schedule it daily using Supabase Cron (or another trusted scheduler) with `select public.cleanup_contact_rate_limits();`. Scheduling is a dashboard/operations step and is not activated by the migration itself.
