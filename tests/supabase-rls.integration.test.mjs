@@ -96,7 +96,9 @@ test("HopeAlive RLS and Storage integration checks", { skip: !configured || !cre
     }).select("id").maybeSingle();
 
     if (!media.error && media.data?.id) {
-      await admin.from("media_assets").delete().eq("id", media.data.id);
+      await admin.functions.invoke("admin-media", {
+        body: { action: "delete_asset", asset_id: media.data.id },
+      });
     }
     assert.ok(media.error, "A signed-in non-admin unexpectedly inserted a media record.");
   });
@@ -108,7 +110,11 @@ test("HopeAlive RLS and Storage integration checks", { skip: !configured || !cre
       contentType: "image/png",
       upsert: false,
     });
-    if (!upload.error) await admin.storage.from("hopealive-private-media").remove([path]);
+    if (!upload.error) {
+      await admin.functions.invoke("admin-media", {
+        body: { action: "queue_orphan_delete", bucket: "hopealive-private-media", path },
+      });
+    }
     assert.ok(upload.error, "A signed-in non-admin unexpectedly uploaded to private media Storage.");
   });
 
