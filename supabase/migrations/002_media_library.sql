@@ -23,8 +23,13 @@ alter table public.media_assets enable row level security;
 
 drop policy if exists "Public read published media" on public.media_assets;
 create policy "Public read published media"
-  on public.media_assets for select to anon, authenticated
-  using (is_published = true or public.is_hopealive_admin());
+  on public.media_assets for select to anon
+  using (is_published = true);
+
+drop policy if exists "Admins read media metadata" on public.media_assets;
+create policy "Admins read media metadata"
+  on public.media_assets for select to authenticated
+  using (public.is_hopealive_admin());
 
 drop policy if exists "Admins insert media metadata" on public.media_assets;
 create policy "Admins insert media metadata"
