@@ -21,7 +21,7 @@ test("contact payload rejects malformed and out-of-range fields", () => {
   assert.equal(normalizeContactPayload({ sender_name: "A", sender_email: "a@b.co", message: "" }), null);
   assert.equal(normalizeContactPayload({ sender_name: "A".repeat(121), sender_email: "a@b.co", message: "x" }), null);
   assert.equal(normalizeContactPayload({ sender_name: "A", sender_email: "a@b.co", message: "x".repeat(5001) }), null);
-  assert.equal(normalizeContactPayload({ sender_name: "A\\u0000B", sender_email: "a@b.co", message: "x" }), null);
+  assert.equal(normalizeContactPayload({ sender_name: "A\u0000B", sender_email: "a@b.co", message: "x" }), null);
 });
 
 test("trusted IP validation accepts IPv4 and IPv6, rejects header injection", () => {
