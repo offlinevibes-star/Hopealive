@@ -98,6 +98,7 @@ set search_path = ''
 as $$
 declare
   v_orphans jsonb;
+  v_referenced jsonb;
   v_broken jsonb;
 begin
   if not public.is_hopealive_admin() then
@@ -117,8 +118,21 @@ begin
     and not public.hopealive_media_content_references(o.name, null);
 
   select coalesce(jsonb_agg(jsonb_build_object(
+    'bucket', o.bucket_id, 'path', o.name, 'created_at', o.created_at
+  ) order by o.created_at), '[]'::jsonb)
+  into v_referenced
+  from storage.objects o
+  where o.bucket_id in ('hopealive-media', 'hopealive-private-media')
+    and not exists (
+      select 1 from public.media_assets m
+      where m.storage_bucket = o.bucket_id and m.storage_path = o.name
+    )
+    and public.hopealive_media_content_references(o.name, null);
+
+  select coalesce(jsonb_agg(jsonb_build_object(
     'id', m.id, 'bucket', m.storage_bucket, 'path', m.storage_path,
-    'display_name', m.display_name, 'delete_pending', m.delete_pending
+    'display_name', m.display_name, 'delete_pending', m.delete_pending,
+    'is_referenced', public.hopealive_media_content_references(m.storage_path, m.public_url)
   ) order by m.created_at), '[]'::jsonb)
   into v_broken
   from public.media_assets m
@@ -130,8 +144,10 @@ begin
   return jsonb_build_object(
     'checked_at', now(),
     'orphaned_objects', v_orphans,
+    'referenced_unregistered_objects', v_referenced,
     'broken_records', v_broken,
     'orphaned_object_count', jsonb_array_length(v_orphans),
+    'referenced_unregistered_object_count', jsonb_array_length(v_referenced),
     'broken_record_count', jsonb_array_length(v_broken)
   );
 end;
