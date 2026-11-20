@@ -194,7 +194,11 @@ Deno.serve(async (req: Request) => {
     const outcome = await processJob(admin, jobId);
     return json({
       ok: outcome.status === "completed",
-      message: outcome.status === "completed" ? "Media deleted." : (outcome.message || "Deletion is queued for retry."),
+      message: outcome.status === "completed"
+        ? "Media deleted."
+        : outcome.status === "blocked"
+          ? "Deletion is blocked because a content reference or active registration was detected: " + (outcome.message || "")
+          : "Deletion did not finish; a retryable cleanup job was saved. " + (outcome.message || ""),
       cleanup: outcome,
     });
   }
@@ -212,7 +216,11 @@ Deno.serve(async (req: Request) => {
     const outcome = await processJob(admin, jobId);
     return json({
       ok: outcome.status === "completed",
-      message: outcome.status === "completed" ? "Orphaned Storage object removed." : (outcome.message || "Cleanup is queued for retry."),
+      message: outcome.status === "completed"
+        ? "Orphaned Storage object removed."
+        : outcome.status === "blocked"
+          ? "Orphan cleanup was blocked because a reference or media record was detected: " + (outcome.message || "")
+          : "Orphan cleanup did not finish; a retryable job was saved. " + (outcome.message || ""),
       cleanup: outcome,
     });
   }
