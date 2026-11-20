@@ -21,7 +21,7 @@ Verify:
 3. A signed-in non-admin cannot insert/update/delete posts or media, access admin activity or change Storage objects.
 4. The allow-listed admin can perform permitted CMS and media operations.
 5. Private media signed URLs are issued only to admins and expire.
-6. The cleanup queue handles successful deletion, Storage failure, metadata failure, retries, stale-running jobs and repeated requests.
+6. The cleanup queue handles successful deletion, Storage failure, metadata failure, retries, stale-running jobs and repeated requests. Concurrent workers cannot claim the same fresh job; stale running jobs become reclaimable after the retry timeout.
 7. Media in use by a published or draft post or public setting cannot be deleted or moved between buckets.
 8. Orphaned objects, referenced-but-unregistered objects and broken database records are correctly distinguished.
 9. Contact requests reject malformed JSON, oversized bodies, invalid fields, honeypot, missing/invalid/expired Turnstile, repeated email, repeated IP, global limit and rate-limit database failure.
