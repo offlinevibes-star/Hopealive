@@ -9,7 +9,7 @@ node --check site.js
 node --test tests/*.test.mjs
 ~~~
 
-The suite parses the public site, admin inline scripts and media manager; checks security-sensitive wiring; and exercises pure contact input normalization/IP validation. It does not prove Supabase RLS, Storage permissions, Turnstile, Edge Function ingress headers, real media operations, or browser workflows.
+The suite parses the public site, admin inline scripts and media manager; checks security-sensitive wiring and direct Storage-delete restrictions; and exercises pure contact input normalization/IP validation. The RLS and browser suites are opt-in and will be skipped unless their test-only credentials, safety confirmation and optional dependencies are present. It does not prove Supabase RLS, Storage permissions, Turnstile, Edge Function ingress headers, real media operations, or browser workflows.
 
 ## Isolated Supabase integration checks still required
 
@@ -27,7 +27,7 @@ Verify:
 9. Contact requests reject malformed JSON, oversized bodies, invalid fields, honeypot, missing/invalid/expired Turnstile, repeated email, repeated IP, global limit and rate-limit database failure.
 10. For IP controls, prove the hosted ingress overwrites a forged client cf-connecting-ip header before setting TRUST_CF_CONNECTING_IP=true.
 
-The repo's static checks do not currently constitute a full live RLS integration test suite. Use test accounts and disposable media only.
+The opt-in suite is in tests/supabase-rls.integration.test.mjs. Install @supabase/supabase-js in the isolated test workspace and set HOPEALIVE_TEST_URL, HOPEALIVE_TEST_ANON_KEY, HOPEALIVE_TEST_ADMIN_EMAIL, HOPEALIVE_TEST_ADMIN_PASSWORD, HOPEALIVE_TEST_NONADMIN_EMAIL, HOPEALIVE_TEST_NONADMIN_PASSWORD, and HOPEALIVE_TEST_CONFIRM_ISOLATED=I_CONFIRM_THIS_IS_NOT_PRODUCTION. It rejects the known production project ref. The test admin-media function must be deployed to the test project. The suite creates temporary probe records only in that confirmed isolated project and attempts cleanup if an unexpected RLS permission is granted.
 
 ## Browser acceptance checks still required
 
@@ -44,7 +44,7 @@ Run desktop and mobile browser tests with isolated test data. Exercise:
 - Contact form success and validation/error states.
 - Keyboard navigation, screen-reader labels, mobile layout and loading/empty/error states.
 
-Playwright browser E2E tests and a runnable isolated RLS fixture suite are still outstanding; configure the test environment before marking acceptance criteria complete.
+The opt-in Playwright smoke test is in tests/admin.browser.test.mjs. Install Playwright and set HOPEALIVE_E2E_BASE_URL, HOPEALIVE_E2E_SUPABASE_URL, HOPEALIVE_E2E_ANON_KEY, HOPEALIVE_E2E_ADMIN_EMAIL, HOPEALIVE_E2E_ADMIN_PASSWORD and HOPEALIVE_E2E_CONFIRM_ISOLATED=I_CONFIRM_THIS_IS_NOT_PRODUCTION. The browser suite rewrites frontend requests from the configured production project URL to the explicitly supplied test project and intercepts the audit RPC to simulate failure. It covers login, the paginated media controls and logout during audit failure; it does not yet automate the full post CRUD, upload/video, reference-blocking and contact/CAPTCHA scenarios listed above.
 
 ## CI
 
