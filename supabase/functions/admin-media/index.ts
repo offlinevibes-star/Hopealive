@@ -217,12 +217,23 @@ Deno.serve(async (req: Request) => {
   }
 
   if (action === "retry_cleanup") {
-    const { data: jobs, error } = await admin.from("media_cleanup_jobs")
-      .select("id").in("status", ["pending", "failed", "blocked"])
-      .order("created_at", { ascending: true }).limit(10);
-    if (error) return json({ ok: false, message: "Could not load cleanup jobs: " + safeError(error) });
+    const staleRunningBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const [queued, stale] = await Promise.all([
+      admin.from("media_cleanup_jobs").select("id")
+        .in("status", ["pending", "failed", "blocked"])
+        .order("created_at", { ascending: true }).limit(10),
+      admin.from("media_cleanup_jobs").select("id")
+        .eq("status", "running").lt("updated_at", staleRunningBefore)
+        .order("created_at", { ascending: true }).limit(10),
+    ]);
+    if (queued.error || stale.error) {
+      return json({ ok: false, message: "Could not load cleanup jobs: " + safeError(queued.error || stale.error) });
+    }
+    const jobs = [...(queued.data || []), ...(stale.data || [])]
+      .filter((job, index, all) => all.findIndex((item) => item.id === job.id) === index)
+      .slice(0, 10);
     const results = [];
-    for (const job of jobs || []) results.push(await processJob(admin, job.id));
+    for (const job of jobs) results.push(await processJob(admin, job.id));
     const completed = results.filter((item) => item.status === "completed").length;
     return json({
       ok: true, attempted: results.length, completed,
