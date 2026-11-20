@@ -11,7 +11,7 @@ alter table public.media_assets alter column display_name set not null;
 create table if not exists public.admin_activity_logs (
   id bigint generated always as identity primary key,
   actor_id uuid references auth.users(id) on delete set null,
-  action text not null check (action in ('insert','update','delete')),
+  action text not null check (action in ('insert','update','delete','login','logout')),
   table_name text not null,
   record_id text,
   summary text not null default 'Administrator changed a record.',
@@ -64,7 +64,7 @@ begin
   if not public.is_hopealive_admin() then
     raise exception 'Administrator access required' using errcode = '42501';
   end if;
-  if p_action not in ('login', 'logout') then
+  if p_action is null or p_action not in ('login', 'logout') then
     raise exception 'Unsupported activity action' using errcode = '22023';
   end if;
   insert into public.admin_activity_logs(actor_id, action, table_name, summary)
