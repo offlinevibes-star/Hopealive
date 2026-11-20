@@ -68,19 +68,23 @@ async function contentIsReferenced(admin: ReturnType<typeof createClient>, bucke
 }
 
 async function processJob(admin: ReturnType<typeof createClient>, jobId: string) {
-  const { data: job, error: readError } = await admin.from("media_cleanup_jobs")
-    .select("*").eq("id", jobId).maybeSingle();
-  if (readError) throw readError;
-  if (!job) throw new Error("Cleanup job not found.");
-  if (job.status === "completed") return { id: job.id, status: "completed" };
-
-  const { error: claimError } = await admin.from("media_cleanup_jobs").update({
-    status: "running",
-    attempts: Number(job.attempts || 0) + 1,
-    last_error: null,
-    updated_at: new Date().toISOString(),
-  }).eq("id", jobId);
+  // Claim atomically in Postgres. A second worker cannot take a fresh "running"
+  // job; stale jobs become eligible again after the retry timeout.
+  const staleRunningBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+  const { data: job, error: claimError } = await admin.rpc("claim_media_cleanup_job", {
+    p_job_id: jobId,
+    p_stale_before: staleRunningBefore,
+  });
   if (claimError) throw claimError;
+
+  if (!job) {
+    const { data: current, error: readError } = await admin.from("media_cleanup_jobs")
+      .select("id,status").eq("id", jobId).maybeSingle();
+    if (readError) throw readError;
+    if (!current) throw new Error("Cleanup job not found.");
+    if (current.status === "completed") return { id: jobId, status: "completed" };
+    return { id: jobId, status: "busy", message: "Cleanup job is already being processed." };
+  }
 
   try {
     if (await contentIsReferenced(admin, job.storage_bucket, job.storage_path, job.reference_url || null)) {
