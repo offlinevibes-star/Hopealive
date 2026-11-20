@@ -46,6 +46,19 @@ Deno.serve(async (req: Request) => {
   }
 
   const ip = req.headers.get("cf-connecting-ip") || req.headers.get("x-real-ip") || "unknown";
+  const turnstileSecret = Deno.env.get("TURNSTILE_SECRET_KEY");
+  if (turnstileSecret) {
+    const token = String(body.turnstile_token || "");
+    if (!token) return json({ error: "Please complete the verification challenge." }, 400);
+    const verification = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ secret: turnstileSecret, response: token, remoteip: ip }),
+    });
+    if (!verification.ok) return json({ error: "Verification service is unavailable." }, 503);
+    const result = await verification.json();
+    if (result.success !== true) return json({ error: "Verification failed. Please try again." }, 400);
+  }
   const ipHash = await sha256(ip + (Deno.env.get("RATE_LIMIT_SALT") || ""));
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
