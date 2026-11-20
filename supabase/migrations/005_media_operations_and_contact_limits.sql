@@ -60,7 +60,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 declare
   v_new_row jsonb := to_jsonb(new);
   v_conflict_id uuid;
@@ -95,7 +95,7 @@ begin
 
   return new;
 end;
-$;
+$$;
 revoke all on function public.prevent_referencing_pending_media() from public, anon, authenticated;
 
 drop trigger if exists prevent_pending_media_reference_on_posts on public.posts;
