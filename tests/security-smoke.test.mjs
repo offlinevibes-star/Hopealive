@@ -5,10 +5,12 @@ import vm from "node:vm";
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const site = read("../site.js");
+const client = read("../supabase-client.js");
 const admin = read("../admin.html");
 const contact = read("../contact.html");
 const importer = read("../supabase-migrate.html");
 const migration = read("../supabase/migrations/003_security_reliability.sql");
+const mediaMigration = read("../supabase/migrations/004_media_metadata_audit.sql");
 const edge = read("../supabase/functions/contact-submit/index.ts");
 
 function inlineScripts(html) {
@@ -52,4 +54,43 @@ test("legacy donation import uses stable upsert keys", () => {
 test("password reset does not disclose a prefilled administrator email", () => {
   const reset = read("../forgot-password.html");
   assert.doesNotMatch(reset, /value="[^"]+@[^"]+"/);
+});
+
+test("media display names and alt text are editable without changing Storage paths", () => {
+  assert.match(mediaMigration, /add column if not exists display_name text/);
+  assert.match(mediaMigration, /add column if not exists alt_text text/);
+  assert.match(admin, /data-mdname/);
+  assert.match(admin, /data-malt/);
+  assert.match(admin, /createSignedUrl\(m\.storage_path,300\)/);
+  assert.match(admin, /display_name:/);
+  assert.match(admin, /alt_text:/);
+  assert.match(admin, /Storage filename renaming is deliberately disabled/);
+  assert.match(site, /cap:m\.display_name\|\|m\.filename/);
+  assert.match(site, /alt:m\.alt_text\|\|m\.display_name/);
+});
+
+test("contact endpoint enforces streamed byte limits and production Turnstile", () => {
+  assert.match(edge, /getReader\(\)/);
+  assert.match(edge, /MAX_BODY_BYTES/);
+  assert.doesNotMatch(edge, /content-length/);
+  assert.match(edge, /!localDev && !secret/);
+  assert.match(edge, /TURNSTILE_ALLOWED_HOSTNAMES/);
+  assert.match(edge, /email:/);
+  assert.doesNotMatch(edge, /x-forwarded-for|x-real-ip/);
+});
+
+test("admin audit trail is restricted and rate-limit cleanup is service-role only", () => {
+  assert.match(mediaMigration, /admin_activity_logs/);
+  assert.ok(mediaMigration.includes("record_admin_auth_event"));
+  assert.ok(admin.includes("p_action:'login'"));
+  assert.ok(admin.includes("p_action:'logout'"));
+  assert.match(mediaMigration, /public\.is_hopealive_admin\(\)/);
+  assert.match(mediaMigration, /cleanup_contact_rate_limits/);
+  assert.match(mediaMigration, /to service_role/);
+});
+
+test("Supabase browser and Edge SDK dependencies are pinned to exact versions", () => {
+  assert.ok(admin.includes("@supabase/supabase-js@2.119.2"));
+  assert.ok(client.includes("@supabase/supabase-js@2.119.2"));
+  assert.ok(edge.includes("@supabase/supabase-js@2.119.2"));
 });
