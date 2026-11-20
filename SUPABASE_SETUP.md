@@ -32,6 +32,7 @@ I can then wire the existing HopeAlive pages to Supabase, migrate the current po
 - `donations`: administrator-only.
 - `contact_messages`: visitors can submit; only allow-listed administrators can read/update/delete.
 - `admin_users`: protected allow-list used by the database authorization function.
+- `media_assets`: public visitors can read published media metadata; only allow-listed administrators can manage it. File objects are served from the public `hopealive-media` bucket, while RLS restricts uploads and mutations.
 
 ## Important production notes
 - The public contact insert policy validates lengths but is not a full anti-spam/rate-limit system. Before launch, add CAPTCHA/Turnstile and a server-side rate-limited Edge Function.
