@@ -131,7 +131,7 @@ test("admin logout does not await audit logging before clearing local session", 
   const logout = admin.match(/\$\('#logout'\)\.onclick=async\(\)=>\{[\s\S]*?\};show\('messages'\)/)?.[0] || "";
   assert.ok(logout.includes("db.auth.signOut({scope:'local'})"));
   assert.ok(logout.includes("void auditPromise"));
-  assert.ok(logout.indexOf("db.auth.signOut") < logout.indexOf("await auditPromise"));
+  assert.ok(!logout.includes("await auditPromise"));
   assert.match(admin, /admin-media\.js/);
 });
 
