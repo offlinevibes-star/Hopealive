@@ -4,6 +4,7 @@ const CONFIG={
  hero:'',       // optional home-page photo: file path or Google Drive share link
  donateLink:'', // optional online payment page (Paystack, Flutterwave, GoFundMe...)
  formspree:'',  // optional Formspree form URL so the contact form sends without opening email
+ turnstileSiteKey:'', // optional Cloudflare Turnstile site key; pair with TURNSTILE_SECRET_KEY in Supabase
  stats:[],      // real figures only, e.g. {n:'250',l:'children supported'}
  phone:'',      // optional public number, e.g. '+234 800 000 0000'
  whatsapp:'',   // optional, digits only with country code, e.g. '2348000000000'
@@ -72,9 +73,10 @@ if(C.whatsapp)L.push(['WhatsApp',`<a href="https://wa.me/${C.whatsapp}">Message 
 const S=Object.entries(C.social).filter(([,u])=>u);
 if(S.length)L.push(['Follow us',S.map(([k,u])=>`<a href="${u}" target="_blank" rel="noopener">${k}</a>`).join(', ')]);
 set('#details',L.map(([k,v])=>`<p><b>${k}</b><br>${v}</p>`).join(''));
-const fm=$('#form');
-if(fm)fm.onsubmit=async e=>{e.preventDefault();const f=new FormData(fm),status=$('#fs');status.textContent='Sending…';const payload={sender_name:String(f.get('name')||'').trim(),sender_email:String(f.get('email')||'').trim(),message:String(f.get('msg')||'').trim()};
- if(db){try{const {data,error}=await db.functions.invoke('contact-submit',{body:{...payload,website:String(f.get('website')||'')}});if(error)throw error;if(data&&data.error)throw Error(data.error);fm.reset();status.textContent='Thank you. Your message has been sent.';return}catch(err){console.error('Supabase contact submission failed',err);status.textContent=err.message||'Sorry, your message could not be sent. Please email us directly.';return}}
+const fm=$('#form');let turnstileToken='';
+if(fm&&C.turnstileSiteKey){const widget=document.createElement('div');widget.id='turnstile-widget';const submit=fm.querySelector('button[type="submit"]');submit.before(widget);const ts=document.createElement('script');ts.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';ts.async=true;ts.defer=true;ts.onload=()=>{if(window.turnstile)window.turnstile.render(widget,{sitekey:C.turnstileSiteKey,callback:token=>{turnstileToken=token},'expired-callback':()=>{turnstileToken=''},'error-callback':()=>{turnstileToken=''}})};document.head.appendChild(ts)}
+if(fm)fm.onsubmit=async e=>{e.preventDefault();const f=new FormData(fm),status=$('#fs');status.textContent='Sending…';if(C.turnstileSiteKey&&!turnstileToken){status.textContent='Please complete the verification challenge.';return}const payload={sender_name:String(f.get('name')||'').trim(),sender_email:String(f.get('email')||'').trim(),message:String(f.get('msg')||'').trim()};
+ if(db){try{const {data,error}=await db.functions.invoke('contact-submit',{body:{...payload,website:String(f.get('website')||''),turnstile_token:turnstileToken}});if(error)throw error;if(data&&data.error)throw Error(data.error);fm.reset();turnstileToken='';if(window.turnstile)window.turnstile.reset();status.textContent='Thank you. Your message has been sent.';return}catch(err){console.error('Supabase contact submission failed',err);status.textContent=err.message||'Sorry, your message could not be sent. Please email us directly.';return}}
  if(C.formspree){try{const r=await fetch(C.formspree,{method:'POST',body:f,headers:{Accept:'application/json'}});if(!r.ok)throw 0;fm.reset();status.textContent='Thank you. Your message has been sent.'}catch(_){status.textContent='Sorry, that did not send. Please email us directly.'}return}
  status.textContent='Sorry, the message could not be sent. Please email us directly.';
 };
