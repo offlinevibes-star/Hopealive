@@ -14,7 +14,7 @@ HopeAlive Foundation website
 Open `yoursite/admin.html` and sign in with the invited, allow-listed Supabase administrator email and password.
 
 - **Posts:** create, edit, publish or draft posts. Add photos and MP4, WebM or MOV video attachments directly to a post.
-- **Media library:** upload multiple images/videos, use filename-based category suggestions or choose a category, add captions, publish items to the public Gallery, and update or delete media.
+- **Media library:** upload multiple images/videos or a ZIP archive, automatically extract ZIP contents in the browser, use filename-based category suggestions or choose a category, add captions, publish items to the public Gallery, and update or delete media.
 - **Settings:** manage the hero image, trustees, contact details, social links, donation details and other site settings.
 - **Messages and Donations:** manage website enquiries and donation records.
 
