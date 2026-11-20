@@ -43,6 +43,9 @@ alter table public.media_cleanup_jobs enable row level security;
 revoke all on public.media_cleanup_jobs from public, anon, authenticated;
 grant all on public.media_cleanup_jobs to service_role;
 
+alter table public.media_cleanup_jobs
+  add column if not exists reference_url text;
+
 create unique index if not exists media_cleanup_jobs_active_path_uidx
   on public.media_cleanup_jobs (operation, storage_bucket, storage_path)
   where status in ('pending', 'running', 'failed', 'blocked');
@@ -52,6 +55,11 @@ create index if not exists media_cleanup_jobs_status_created_idx
 -- Browser administrators must request deletions through the authenticated Edge Function.
 revoke delete on public.media_assets from anon, authenticated;
 grant select, insert, update on public.media_assets to authenticated;
+
+-- All object deletions must pass through the reference-aware service-role cleanup queue.
+drop policy if exists "HopeAlive admins delete media files" on storage.objects;
+drop policy if exists "HopeAlive admins delete private media files" on storage.objects;
+revoke delete on storage.objects from anon, authenticated;
 
 -- Keep published reads public while avoiding the deprecated auth.role() policy expression.
 drop policy if exists "Read published posts or admin posts" on public.posts;
