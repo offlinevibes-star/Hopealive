@@ -106,8 +106,8 @@ as $
          or (p_public_url is not null and s.settings::text ilike '%' || p_public_url || '%')
     );
 $;
-revoke all on function public.hopealive_media_content_references(text, text) from public, anon, authenticated;
-grant execute on function public.hopealive_media_content_references(text, text) to service_role;
+revoke all on function public.hopealive_media_content_references(text, text, text) from public, anon, authenticated;
+grant execute on function public.hopealive_media_content_references(text, text, text) to service_role;
 
 create or replace function public.get_media_integrity_report()
 returns jsonb
