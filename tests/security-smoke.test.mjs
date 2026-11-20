@@ -107,7 +107,7 @@ test("media operations use paginated queries and page-scoped private previews", 
 
 test("browser code cannot directly delete media Storage objects", () => {
   assert.doesNotMatch(admin, /storage\.from\([^)]*\)\.remove\(/);
-  assert.match(operationsMigration, /revoke delete on storage\.objects from anon, authenticated/i);
+  assert.match(operationsMigration, /storage\.objects is shared by/i);
   assert.match(operationsMigration, /drop policy if exists "HopeAlive admins delete media files"/);
   assert.match(operationsMigration, /drop policy if exists "HopeAlive admins delete private media files"/);
 });
