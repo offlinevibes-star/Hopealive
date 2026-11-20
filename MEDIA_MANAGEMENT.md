@@ -45,7 +45,7 @@ The reference scan searches the full serialized post rows (including the JSON at
 
 ## Operational requirements
 
-1. Apply migrations 001–005 in order in a reviewed maintenance window.
+1. Apply migrations 001–006 in order in a reviewed maintenance window.
 2. Deploy admin-media with JWT verification enabled (the function independently checks the signed-in user's identity and admin allow-list membership before using the service role).
 3. Confirm the function's Supabase environment has its standard URL, anon key and service-role key configured. Never expose the service-role key in browser code.
 4. Exercise upload, metadata edits, visibility moves, delete-in-use rejection, transient Storage failure and cleanup retry in an isolated Supabase project before production rollout.
