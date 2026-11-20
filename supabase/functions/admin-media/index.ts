@@ -82,7 +82,7 @@ async function processJob(admin: ReturnType<typeof createClient>, jobId: string)
   if (claimError) throw claimError;
 
   try {
-    if (await contentIsReferenced(admin, job.storage_path, null)) {
+    if (await contentIsReferenced(admin, job.storage_path, job.reference_url || null)) {
       const message = "The Storage path is now referenced by a post or public setting; cleanup was blocked.";
       await admin.from("media_cleanup_jobs").update({
         status: "blocked", last_error: message, updated_at: new Date().toISOString(),
@@ -261,7 +261,7 @@ Deno.serve(async (req: Request) => {
     const { data: blob, error: downloadError } = await admin.storage.from(sourceBucket).download(asset.storage_path);
     if (downloadError || !blob) return json({ ok: false, message: "Could not read the source Storage object: " + safeError(downloadError) });
     const { error: uploadError } = await admin.storage.from(targetBucket).upload(asset.storage_path, blob, {
-      contentType: asset.mime_type, cacheControl: "31536000", upsert: true,
+      contentType: asset.mime_type, cacheControl: "31536000", upsert: false,
     });
     if (uploadError) return json({ ok: false, message: "Could not copy the Storage object: " + safeError(uploadError) });
 
