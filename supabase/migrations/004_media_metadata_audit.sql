@@ -53,6 +53,28 @@ drop trigger if exists hopealive_audit_donations on public.donations;
 create trigger hopealive_audit_donations after insert or update or delete on public.donations
 for each row execute function public.log_hopealive_admin_change();
 
+
+create or replace function public.record_admin_auth_event(p_action text)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $
+begin
+  if not public.is_hopealive_admin() then
+    raise exception 'Administrator access required' using errcode = '42501';
+  end if;
+  if p_action not in ('login', 'logout') then
+    raise exception 'Unsupported activity action' using errcode = '22023';
+  end if;
+  insert into public.admin_activity_logs(actor_id, action, table_name, summary)
+  values (auth.uid(), p_action, 'auth',
+    case when p_action = 'login' then 'Administrator signed in.' else 'Administrator signed out.' end);
+end;
+$;
+revoke all on function public.record_admin_auth_event(text) from public, anon;
+grant execute on function public.record_admin_auth_event(text) to authenticated;
+
 create or replace function public.cleanup_contact_rate_limits()
 returns bigint language plpgsql security definer set search_path = ''
 as $$
