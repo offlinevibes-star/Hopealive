@@ -162,6 +162,6 @@ test("Supabase browser and Edge SDK dependencies are pinned to exact versions", 
 test("media cleanup jobs use atomic service-role-only claims", () => {
   assert.match(mediaOperations, /claim_media_cleanup_job/);
   assert.match(claimMigration, /status = 'running' and updated_at < p_stale_before/i);
-  assert.match(claimMigration, /revoke all on function public\\.claim_media_cleanup_job[\\s\\S]*from public, anon, authenticated/i);
-  assert.match(claimMigration, /grant execute on function public\\.claim_media_cleanup_job[\\s\\S]*to service_role/i);
+  assert.match(claimMigration, /revoke all on function public\.claim_media_cleanup_job[\s\S]*from public, anon, authenticated/i);
+  assert.match(claimMigration, /grant execute on function public\.claim_media_cleanup_job[\s\S]*to service_role/i);
 });
