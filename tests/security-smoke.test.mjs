@@ -86,7 +86,7 @@ test("admin audit trail is restricted and rate-limit cleanup is service-role onl
 });
 
 test("Supabase browser and Edge SDK dependencies are pinned to exact versions", () => {
-  assert.match(admin, /@supabase\\/supabase-js@2\\.119\\.2/);
-  assert.match(client, /@supabase\\/supabase-js@2\\.119\\.2/);
-  assert.match(edge, /@supabase\\/supabase-js@2\\.119\\.2/);
+  assert.ok(admin.includes("@supabase/supabase-js@2.119.2"));
+  assert.ok(client.includes("@supabase/supabase-js@2.119.2"));
+  assert.ok(edge.includes("@supabase/supabase-js@2.119.2"));
 });
