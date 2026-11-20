@@ -3,12 +3,21 @@ on:
   pull_request:
   push:
     branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   static-checks:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --test tests/security-smoke.test.mjs
+      - name: Check public site JavaScript syntax
+        run: node --check site.js
+      - name: Run security and media smoke tests
+        run: node --test tests/security-smoke.test.mjs
