@@ -194,7 +194,7 @@ a.tag{text-decoration:none;font-size:14px;font-weight:700}
 .gallery-empty{grid-column:1/-1;display:grid;gap:6px;place-content:center;min-height:200px;padding:28px;border:1px dashed #d4d9e5;border-radius:18px;background:#f7f8fc;text-align:center;color:#303b5e}
 .gallery-empty span{color:#717b91;font-size:14px}
 .gallery-pagination{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:8px;margin-top:30px}
-.gallery-page-btn{min-width:42px;min-height:42px;padding:8px 13px;border:2px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink);font:700 14px/1 inherit;cursor:pointer;transition:background .15s ease,color .15s ease,transform .15s ease}
+.gallery-page-btn{min-width:42px;min-height:42px;padding:8px 13px;border:2px solid var(--ink);border-radius:12px;background:#fff;color:var(--ink);font-family:inherit;font-size:14px;font-weight:700;line-height:1.2;cursor:pointer;transition:background .15s ease,color .15s ease,transform .15s ease}
 .gallery-page-btn:hover:not(:disabled){background:var(--mist);transform:translateY(-1px)}
 .gallery-page-btn[aria-current="page"]{background:var(--ink);color:#fff}
 .gallery-page-btn:disabled{opacity:.35;cursor:not-allowed}
@@ -214,7 +214,7 @@ a.tag{text-decoration:none;font-size:14px;font-weight:700}
 .gallery-viewer .viewer-caption{min-width:0;color:#fff}
 .gallery-viewer #lc{margin:0;color:#fff;font-size:16px;font-weight:700}
 .gallery-viewer #lb-count{display:block;margin-top:5px;color:#c6cbe0;font-size:12px}
-.gallery-viewer .viewer-play{flex:none;min-height:42px;padding:9px 17px;border:1px solid #ffffff7a;border-radius:999px;background:#ffc233;color:#14143c;font:800 13px/1 inherit;cursor:pointer}
+.gallery-viewer .viewer-play{flex:none;min-height:42px;padding:9px 17px;border:1px solid #ffffff7a;border-radius:999px;background:#ffc233;color:#14143c;font-family:inherit;font-size:13px;font-weight:800;line-height:1.2;cursor:pointer}
 .gallery-viewer .viewer-play:hover{background:#ffda7d}
 @media(max-width:650px){
  .gallery-pagination{gap:5px;margin-top:22px}
