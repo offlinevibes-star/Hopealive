@@ -19,6 +19,7 @@ const operationsMigration = read("../supabase/migrations/005_media_operations_an
 const auditMigration = read("../supabase/migrations/004_media_metadata_audit.sql");
 const claimMigration = read("../supabase/migrations/007_atomic_media_cleanup_claim.sql");
 const referenceLockMigration = read("../supabase/migrations/008_atomic_media_reference_lock.sql");
+const rpcHardeningMigration = read("../supabase/migrations/009_internal_media_rpc_and_audit_hardening.sql");
 
 function inlineScripts(html) {
   return [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
@@ -172,4 +173,21 @@ test("media reference writes and cleanup requests share a transaction-scoped adv
   assert.match(referenceLockMigration, /enqueue_media_orphan_delete[\s\S]*perform pg_advisory_xact_lock\(1479618616, 1\)[\s\S]*hopealive_media_content_references/);
   assert.match(referenceLockMigration, /set_media_asset_visibility[\s\S]*perform pg_advisory_xact_lock\(1479618616, 1\)[\s\S]*hopealive_media_content_references/);
   assert.match(referenceLockMigration, /v_asset\.delete_pending/);
+});
+
+test("privileged media RPCs are service-role-only and retain verified admin attribution", () => {
+  assert.match(rpcHardeningMigration, /get_media_integrity_report\(p_actor_id uuid\)/);
+  assert.match(rpcHardeningMigration, /enqueue_media_asset_delete\(p_actor_id uuid, p_asset_id uuid\)/);
+  assert.match(rpcHardeningMigration, /enqueue_media_orphan_delete\(p_actor_id uuid, p_bucket text, p_path text\)/);
+  assert.match(rpcHardeningMigration, /set_media_asset_visibility\([\s\S]*p_actor_id uuid/);
+  assert.match(rpcHardeningMigration, /finalize_media_asset_delete\(p_job_id uuid, p_actor_id uuid\)/);
+  assert.match(rpcHardeningMigration, /grant execute on function public\.enqueue_media_asset_delete\(uuid, uuid\) to service_role/i);
+  assert.match(rpcHardeningMigration, /grant execute on function public\.get_media_integrity_report\(uuid\) to service_role/i);
+  assert.match(rpcHardeningMigration, /grant execute on function public\.finalize_media_asset_delete\(uuid, uuid\) to service_role/i);
+  assert.match(rpcHardeningMigration, /security invoker[\s\S]*record_admin_auth_event/);
+  assert.match(mediaOperations, /admin\.rpc\("get_media_integrity_report"/);
+  assert.match(mediaOperations, /admin\.rpc\("enqueue_media_asset_delete"/);
+  assert.match(mediaOperations, /admin\.rpc\("enqueue_media_orphan_delete"/);
+  assert.match(mediaOperations, /admin\.rpc\("finalize_media_asset_delete"/);
+  assert.doesNotMatch(mediaOperations, /authClient\.rpc\("(?:get_media_integrity_report|enqueue_media_asset_delete|enqueue_media_orphan_delete)/);
 });
