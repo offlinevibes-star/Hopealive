@@ -1,4 +1,4 @@
-/* Admin media library enhancements: paginated queries and server-side destructive operations. */
+/* HopeAlive admin media library: paginated, searchable and persistence-verified */
 const hopeMediaState = {
   page: 0,
   pageSize: 24,
@@ -9,14 +9,15 @@ const hopeMediaState = {
   count: 0,
   rows: [],
   report: null,
+  requestId: 0,
 };
 
 function hopeMediaEscapeLike(value) {
   return String(value || "").replace(/[\\%_]/g, "\\$&");
 }
-function hopeMediaValidateText(value, max, field) {
+function hopeMediaValidateText(value, max, field, required) {
   const text = String(value ?? "").trim();
-  if (!text) throw new Error(field + " cannot be empty.");
+  if (required && !text) throw new Error(field + " cannot be empty.");
   if (text.length > max) throw new Error(field + " must be " + max + " characters or fewer.");
   if (/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(text)) {
     throw new Error(field + " contains invalid control characters.");
@@ -37,78 +38,350 @@ async function hopeMediaAction(payload) {
 async function hopeCleanupDetachedObject(bucket, path) {
   return hopeMediaAction({ action: "queue_orphan_delete", bucket, path });
 }
-function hopeMediaCard(m) {
-  const preview = m.display_url
-    ? (m.media_type === "video"
-      ? '<video class="media-preview" data-media-preview="true" controls preload="none" src="' + esc(m.display_url) + '"></video>'
-      : '<img class="media-preview" data-media-preview="true" loading="lazy" src="' + esc(m.display_url) + '" alt="' + esc(m.alt_text || m.display_name || m.filename) + '">')
-    : '<div class="media-preview" role="img" aria-label="Preview unavailable" style="display:grid;place-items:center">Preview unavailable</div>';
-  const pending = m.delete_pending === true;
-  return '<article class="media-card" data-media-card="' + esc(m.id) + '">' +
-    '<div>' + preview + '</div>' +
-    '<p><b>' + esc(m.display_name || m.filename) + '</b></p>' +
-    '<p class="muted">Original filename: ' + esc(m.filename) +
-    '<br>' + esc(m.mime_type) + ' · ' + Number(m.size_bytes || 0).toLocaleString() +
-    ' bytes · Uploaded ' + esc(new Date(m.created_at).toLocaleString()) +
-    ' · ' + (m.is_published ? "Public" : "Private") +
-    '<br>Storage path: ' + esc(m.storage_path) + '</p>' +
-    '<label>Display name<input data-mdname="' + esc(m.id) + '" maxlength="180" required value="' + esc(m.display_name || m.filename) + '"></label>' +
-    '<label>Alt text<input data-malt="' + esc(m.id) + '" maxlength="500" value="' + esc(m.alt_text || '') + '"></label>' +
-    '<label>Category<select data-mcat="' + esc(m.id) + '">' + categoryOptions(m.category, false) + '</select></label>' +
-    '<label>Caption<input data-mcaption="' + esc(m.id) + '" maxlength="1000" value="' + esc(m.caption || '') + '"></label>' +
-    '<label>Gallery visibility<select data-mpublished="' + esc(m.id) + '">' +
-      '<option value="true" ' + (m.is_published ? 'selected' : '') + '>Public gallery</option>' +
-      '<option value="false" ' + (!m.is_published ? 'selected' : '') + '>Private / unpublished</option>' +
-    '</select></label>' +
-    (pending ? '<p class="muted" role="status">Deletion is pending cleanup. Use Retry cleanup above.</p>' : '') +
-    '<button type="button" class="b" data-savemedia="' + esc(m.id) + '">Save details</button> ' +
-    '<button type="button" class="b danger" data-delmedia="' + esc(m.id) + '" ' + (pending ? 'disabled' : '') + '>Delete</button>' +
-    '</article>';
+function hopeMediaEscapeHtml(value) {
+  return esc(value == null ? "" : String(value));
 }
-
+function hopeMediaCard(asset) {
+  const id = hopeMediaEscapeHtml(asset.id);
+  const previewUrl = asset.display_url ? hopeMediaEscapeHtml(asset.display_url) : "";
+  const preview = previewUrl
+    ? (asset.media_type === "video"
+      ? '<video data-hm-preview controls preload="none" playsinline src="' + previewUrl + '"></video>'
+      : '<img data-hm-preview loading="lazy" decoding="async" src="' + previewUrl + '" alt="' + hopeMediaEscapeHtml(asset.alt_text || asset.display_name || asset.filename) + '">')
+    : '<div class="hm-placeholder"><span>▧</span>Preview unavailable</div>';
+  const isVideo = asset.media_type === "video";
+  const pending = asset.delete_pending === true;
+  return '<article class="hm-card" data-hm-card="' + id + '">' +
+    '<div class="hm-preview">' + preview + '<span class="hm-type-tag">' + (isVideo ? "VIDEO" : "IMAGE") + '</span></div>' +
+    '<div class="hm-card-content">' +
+      '<div class="hm-card-head"><h4>' + hopeMediaEscapeHtml(asset.display_name || asset.filename) + '</h4>' +
+        '<span class="hm-visibility ' + (asset.is_published ? "" : "private") + '">' + (asset.is_published ? "PUBLIC" : "PRIVATE") + '</span></div>' +
+      '<div class="hm-file-meta"><span>Original: ' + hopeMediaEscapeHtml(asset.filename) + '</span>' +
+        '<span>' + Number(asset.size_bytes || 0).toLocaleString() + ' bytes · ' + new Date(asset.created_at).toLocaleDateString() + '</span></div>' +
+      '<label class="hm-form-field">Display name<input data-mdname="' + id + '" maxlength="180" required value="' + hopeMediaEscapeHtml(asset.display_name || asset.filename) + '" autocomplete="off"></label>' +
+      '<details class="hm-details"><summary>More details and visibility</summary><div class="hm-edit-fields">' +
+        '<label class="hm-form-field">Alt text<textarea data-malt="' + id + '" maxlength="500" rows="2">' + hopeMediaEscapeHtml(asset.alt_text || "") + '</textarea></label>' +
+        '<label class="hm-form-field">Caption<textarea data-mcaption="' + id + '" maxlength="1000" rows="2">' + hopeMediaEscapeHtml(asset.caption || "") + '</textarea></label>' +
+        '<label class="hm-form-field">Category<select data-mcat="' + id + '">' + categoryOptions(asset.category, false) + '</select></label>' +
+        '<label class="hm-form-field">Gallery visibility<select data-mpublished="' + id + '">' +
+          '<option value="true" ' + (asset.is_published ? "selected" : "") + '>Public Gallery</option>' +
+          '<option value="false" ' + (!asset.is_published ? "selected" : "") + '>Private / unpublished</option>' +
+        '</select></label>' +
+        '<div class="hm-file-meta"><span>Storage: ' + hopeMediaEscapeHtml(asset.storage_bucket || MEDIA_BUCKET) + '</span><span>Path: ' + hopeMediaEscapeHtml(asset.storage_path) + '</span></div>' +
+      '</div></details>' +
+      (pending ? '<p class="hm-pending" role="status">Deletion is pending. Use Retry cleanup.</p>' : '') +
+      '<div class="hm-card-actions"><button type="button" class="hm-btn hm-btn-primary" data-hm-save="' + id + '"' + (pending ? " disabled" : "") + '>Save changes</button>' +
+      '<button type="button" class="hm-btn hm-btn-danger" data-hm-delete="' + id + '"' + (pending ? " disabled" : "") + '>Delete</button></div>' +
+    '</div></article>';
+}
+function hopeMediaPages(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, index) => index + 1);
+  const pages = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  if (start > 2) pages.push("…");
+  for (let page = start; page <= end; page++) pages.push(page);
+  if (end < total - 1) pages.push("…");
+  pages.push(total);
+  return pages;
+}
+function hopeMediaPagination() {
+  const totalPages = Math.max(1, Math.ceil(hopeMediaState.count / hopeMediaState.pageSize));
+  const first = hopeMediaState.count ? hopeMediaState.page * hopeMediaState.pageSize + 1 : 0;
+  const last = Math.min(hopeMediaState.count, (hopeMediaState.page + 1) * hopeMediaState.pageSize);
+  const pages = hopeMediaPages(hopeMediaState.page + 1, totalPages);
+  const buttons = pages.map((page) => page === "…"
+    ? '<span class="hm-page-ellipsis">…</span>'
+    : '<button type="button" class="hm-page-button" data-hm-page="' + page + '" ' +
+      (page === hopeMediaState.page + 1 ? 'aria-current="page"' : "") + '>' + page + '</button>').join("");
+  const target = $("#media-pagination");
+  if (!target) return;
+  target.innerHTML =
+    '<span class="hm-page-info">Showing ' + first + '–' + last + ' of ' + hopeMediaState.count + ' files · Page ' +
+      (hopeMediaState.page + 1) + ' of ' + totalPages + '</span>' +
+    '<div class="hm-page-buttons">' +
+      '<button type="button" class="hm-page-button" data-hm-prev ' + (hopeMediaState.page === 0 ? "disabled" : "") + '>Previous</button>' +
+      buttons +
+      '<button type="button" class="hm-page-button" data-hm-next ' + (hopeMediaState.page + 1 >= totalPages ? "disabled" : "") + '>Next</button>' +
+    '</div>';
+  target.querySelectorAll("[data-hm-page]").forEach((button) => {
+    button.onclick = () => { hopeMediaState.page = Number(button.dataset.hmPage) - 1; hopeLoadMediaPage(); };
+  });
+  const previous = target.querySelector("[data-hm-prev]");
+  const next = target.querySelector("[data-hm-next]");
+  if (previous) previous.onclick = () => { if (hopeMediaState.page > 0) { hopeMediaState.page--; hopeLoadMediaPage(); } };
+  if (next) next.onclick = () => { if ((hopeMediaState.page + 1) * hopeMediaState.pageSize < hopeMediaState.count) { hopeMediaState.page++; hopeLoadMediaPage(); } };
+}
+function hopeMediaRenderReport() {
+  const target = $("#media-integrity-report");
+  const report = hopeMediaState.report;
+  if (!target || !report) { if (target) target.innerHTML = ""; return; }
+  const orphans = Array.isArray(report.orphaned_objects) ? report.orphaned_objects : [];
+  const referenced = Array.isArray(report.referenced_unregistered_objects) ? report.referenced_unregistered_objects : [];
+  const broken = Array.isArray(report.broken_records) ? report.broken_records : [];
+  let html = '<div class="hm-report"><h4>Storage health check</h4><p>Checked ' +
+    hopeMediaEscapeHtml(new Date(report.checked_at).toLocaleString()) + ' · ' + orphans.length +
+    ' unregistered objects · ' + referenced.length + ' referenced objects · ' + broken.length +
+    ' missing-file records. This scan does not delete anything.</p>';
+  if (orphans.length) {
+    html += '<h5 class="hm-report-subhead">Unregistered objects safe to review</h5><div class="hm-report-list">' +
+      orphans.map((item, index) => '<div class="hm-report-item"><span>' +
+        hopeMediaEscapeHtml(item.bucket + " / " + item.path) +
+        '</span><button type="button" class="hm-btn hm-btn-danger" data-hm-orphan="' + index + '">Queue delete</button></div>').join("") +
+      '</div>';
+  }
+  if (referenced.length) {
+    html += '<h5 class="hm-report-subhead">Unregistered but referenced</h5><div class="hm-report-list">' +
+      referenced.map((item) => '<div class="hm-report-item"><span>' +
+        hopeMediaEscapeHtml(item.bucket + " / " + item.path) +
+        '</span><span>In use — blocked</span></div>').join("") + '</div>';
+  }
+  if (broken.length) {
+    html += '<h5 class="hm-report-subhead">Media records with missing files</h5><div class="hm-report-list">' +
+      broken.map((item, index) => '<div class="hm-report-item"><span>' +
+        hopeMediaEscapeHtml(item.display_name || item.path) + ' · ' + hopeMediaEscapeHtml(item.bucket + " / " + item.path) +
+        '</span>' + (item.is_referenced
+          ? '<span>In use — blocked</span>'
+          : '<button type="button" class="hm-btn hm-btn-danger" data-hm-broken="' + index + '">Remove record</button>') +
+        '</div>').join("") + '</div>';
+  }
+  if (!orphans.length && !referenced.length && !broken.length) {
+    html += '<p>No missing or unregistered media was found.</p>';
+  }
+  target.innerHTML = html + '</div>';
+  target.querySelectorAll("[data-hm-orphan]").forEach((button) => {
+    button.onclick = async () => {
+      const item = orphans[Number(button.dataset.hmOrphan)];
+      if (!item || !confirm("Queue permanent deletion of " + item.bucket + " / " + item.path + "?")) return;
+      button.disabled = true;
+      try {
+        const result = await hopeMediaAction({ action: "queue_orphan_delete", bucket: item.bucket, path: item.path });
+        say(result.message || "Orphan cleanup completed.");
+        await hopeMediaRunScan();
+      } catch (error) {
+        say("The object was not deleted: " + (error.message || String(error)));
+        button.disabled = false;
+      }
+    };
+  });
+  target.querySelectorAll("[data-hm-broken]").forEach((button) => {
+    button.onclick = async () => {
+      const item = broken[Number(button.dataset.hmBroken)];
+      if (!item || !confirm("Remove this broken media record? The server will recheck content references.")) return;
+      button.disabled = true;
+      try {
+        const result = await hopeMediaAction({ action: "delete_asset", asset_id: item.id });
+        say(result.message || "Broken media record removed.");
+        await hopeMediaRunScan();
+        await hopeLoadMediaPage();
+      } catch (error) {
+        say("The record was not removed: " + (error.message || String(error)));
+        button.disabled = false;
+      }
+    };
+  });
+}
+async function hopeMediaRunScan() {
+  const button = $("#media-scan");
+  if (button) button.disabled = true;
+  try {
+    const result = await hopeMediaAction({ action: "scan" });
+    hopeMediaState.report = result.report;
+    hopeMediaRenderReport();
+    say("Media health check completed. No files were removed by the scan.");
+  } catch (error) {
+    say("Health check failed: " + (error.message || String(error)));
+  } finally { if (button) button.disabled = false; }
+}
+async function hopeMediaSave(button) {
+  const id = button.dataset.hmSave;
+  const asset = hopeMediaState.rows.find((row) => row.id === id);
+  if (!asset) return;
+  const originalText = button.textContent;
+  button.disabled = true;
+  button.textContent = "Saving…";
+  try {
+    const displayName = hopeMediaValidateText($("#media [data-mdname='" + id + "']").value, 180, "Display name", true);
+    const altText = hopeMediaValidateText($("#media [data-malt='" + id + "']").value, 500, "Alt text", false);
+    const caption = hopeMediaValidateText($("#media [data-mcaption='" + id + "']").value, 1000, "Caption", false);
+    const category = $("#media [data-mcat='" + id + "']").value;
+    if (!MEDIA_CATEGORIES.includes(category)) throw new Error("Choose a valid category.");
+    const { data: saved, error } = await db.from("media_assets").update({
+      display_name: displayName,
+      alt_text: altText,
+      caption,
+      category,
+      updated_at: new Date().toISOString(),
+    }).eq("id", id).select("id,display_name,alt_text,caption,category,updated_at").maybeSingle();
+    if (error) {
+      if (/display_name|alt_text|column/i.test(error.message || "")) {
+        throw new Error("The media name fields are not installed in the database yet. Apply migration 004_media_metadata_audit.sql, then try again.");
+      }
+      throw error;
+    }
+    if (!saved || saved.id !== id) {
+      throw new Error("No media row was updated. Your admin session or media update permission may have expired; sign in again or ask an administrator to check the media update policy.");
+    }
+    const desiredPublished = $("#media [data-mpublished='" + id + "']").value === "true";
+    let visibilityWarning = "";
+    if (desiredPublished !== asset.is_published) {
+      try {
+        const result = await hopeMediaAction({ action: "set_visibility", asset_id: id, is_published: desiredPublished });
+        visibilityWarning = result.cleanup && result.cleanup.status !== "completed"
+          ? " Details saved. Visibility changed; old-file cleanup is pending."
+          : " Details and Gallery visibility saved.";
+      } catch (visibilityError) {
+        visibilityWarning = " Details saved, but Gallery visibility did not change: " + (visibilityError.message || String(visibilityError));
+      }
+    }
+    say(visibilityWarning
+      ? visibilityWarning.trim()
+      : "Saved successfully. The original filename and file URL are unchanged.");
+    await hopeLoadMediaPage();
+  } catch (error) {
+    say("Could not save media details: " + (error.message || String(error)));
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+async function hopeMediaDelete(button) {
+  const id = button.dataset.hmDelete;
+  const asset = hopeMediaState.rows.find((row) => row.id === id);
+  if (!asset || !confirm("Delete this media file permanently? Files used by posts or website settings are protected.")) return;
+  button.disabled = true;
+  button.textContent = "Deleting…";
+  try {
+    const result = await hopeMediaAction({ action: "delete_asset", asset_id: id });
+    say(result.message || "Media deleted.");
+    if ((hopeMediaState.page * hopeMediaState.pageSize) >= Math.max(0, hopeMediaState.count - 1) && hopeMediaState.page > 0) {
+      hopeMediaState.page--;
+    }
+    await hopeLoadMediaPage();
+  } catch (error) {
+    say("Deletion was not completed: " + (error.message || String(error)));
+    button.disabled = false;
+    button.textContent = "Delete";
+    await hopeLoadMediaPage();
+  }
+}
+async function hopeLoadMediaPage() {
+  const grid = $("#media-grid");
+  if (!grid) return;
+  const requestId = ++hopeMediaState.requestId;
+  grid.innerHTML = '<div class="hm-skeleton"></div><div class="hm-skeleton"></div><div class="hm-skeleton"></div>';
+  const first = hopeMediaState.page * hopeMediaState.pageSize;
+  try {
+    let query = db.from("media_assets").select(
+      "id,filename,display_name,alt_text,storage_path,storage_bucket,public_url,caption,category,media_type,mime_type,size_bytes,is_published,delete_pending,created_at,updated_at",
+      { count: "exact" },
+    );
+    if (hopeMediaState.query) {
+      query = query.ilike("display_name", "%" + hopeMediaEscapeLike(hopeMediaState.query) + "%");
+    }
+    if (hopeMediaState.type !== "all") query = query.eq("media_type", hopeMediaState.type);
+    if (hopeMediaState.visibility !== "all") {
+      query = query.eq("is_published", hopeMediaState.visibility === "public");
+    }
+    if (hopeMediaState.sort === "name") {
+      query = query.order("display_name", { ascending: true }).order("id", { ascending: true });
+    } else {
+      query = query.order("created_at", { ascending: hopeMediaState.sort === "oldest" }).order("id", { ascending: true });
+    }
+    const { data, error, count } = await query.range(first, first + hopeMediaState.pageSize - 1);
+    if (error) {
+      if (/display_name|alt_text|column/i.test(error.message || "")) {
+        throw new Error("The media library needs database migration 004 for editable names and pagination. The live database is missing display_name/alt_text.");
+      }
+      throw error;
+    }
+    if (requestId !== hopeMediaState.requestId) return;
+    hopeMediaState.rows = data || [];
+    hopeMediaState.count = count || 0;
+    const pages = Math.max(1, Math.ceil(hopeMediaState.count / hopeMediaState.pageSize));
+    if (hopeMediaState.page >= pages) {
+      hopeMediaState.page = pages - 1;
+      return hopeLoadMediaPage();
+    }
+    const visible = await Promise.all(hopeMediaState.rows.map(async (asset) => {
+      const bucket = asset.storage_bucket || MEDIA_BUCKET;
+      let displayUrl = bucket === MEDIA_BUCKET ? asset.public_url : null;
+      if (bucket === PRIVATE_MEDIA_BUCKET) {
+        const { data: signed, error: signError } = await db.storage.from(bucket).createSignedUrl(asset.storage_path, 300);
+        if (!signError) displayUrl = signed?.signedUrl || null;
+      }
+      return { ...asset, display_url: displayUrl };
+    }));
+    if (requestId !== hopeMediaState.requestId) return;
+    grid.innerHTML = visible.length
+      ? visible.map(hopeMediaCard).join("")
+      : '<div class="hm-empty"><strong>No media found</strong><p>Try changing the search or filters, or upload your first image or video.</p></div>';
+    $("#media-count").textContent = hopeMediaState.count.toLocaleString() + " files";
+    $("#media-stat-total").textContent = hopeMediaState.count.toLocaleString();
+    $("#media-stat-images").textContent = hopeMediaState.rows.filter((row) => row.media_type === "image").length.toLocaleString();
+    $("#media-stat-videos").textContent = hopeMediaState.rows.filter((row) => row.media_type === "video").length.toLocaleString();
+    grid.querySelectorAll("[data-hm-preview]").forEach((preview) => {
+      preview.addEventListener("error", () => {
+        const placeholder = document.createElement("div");
+        placeholder.className = "hm-placeholder";
+        placeholder.innerHTML = "<span>▧</span>Preview unavailable";
+        preview.replaceWith(placeholder);
+      }, { once: true });
+    });
+    hopeMediaPagination();
+    grid.querySelectorAll("[data-hm-save]").forEach((button) => button.onclick = () => hopeMediaSave(button));
+    grid.querySelectorAll("[data-hm-delete]").forEach((button) => button.onclick = () => hopeMediaDelete(button));
+    hopeMediaRenderReport();
+  } catch (error) {
+    if (requestId !== hopeMediaState.requestId) return;
+    grid.innerHTML = '<div class="hm-error"><strong>Media could not be loaded</strong><p>' +
+      hopeMediaEscapeHtml(error.message || String(error)) +
+      '</p><button type="button" class="hm-btn" id="hm-media-retry">Try again</button></div>';
+    const retry = $("#hm-media-retry");
+    if (retry) retry.onclick = hopeLoadMediaPage;
+    $("#media-count").textContent = "Unavailable";
+    $("#media-pagination").innerHTML = "";
+    say("Media library: " + (error.message || String(error)));
+  }
+}
 async function loadMedia() {
   const panel = $("#media");
+  panel.classList.add("hm-panel");
   panel.innerHTML =
-    '<div class="bar"><h2>Media library</h2><span id="media-count" class="muted">Loading…</span></div>' +
-    '<p class="muted">Upload images and videos, edit display names, alt text and captions, and choose whether an item appears in the public Gallery. The original uploaded filename and Storage path are preserved; display-name edits never change media URLs or video playback. Storage visibility moves and deletion run through the authenticated server-side media service. Deletion is blocked while posts or public settings reference the file. Private previews are signed only for the current page.</p>' +
-    '<form id="mediaform"><div class="grid">' +
-      '<label class="upload-dropzone" id="media-dropzone">Select photos/videos or ZIP<input id="media-files" name="files" type="file" accept=".zip,application/zip,image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple required>' +
-      '<small>Select multiple files or drag them here. Each extracted file is limited to 50 MB.</small></label>' +
-      '<label>Category<select name="category">' + categoryOptions('auto', true) + '</select></label>' +
-      '<label>Caption (optional)<input name="caption" maxlength="1000" placeholder="A short description for these files"></label>' +
-    '</div><p id="media-selection" class="muted" role="status">No files selected yet.</p>' +
-    '<label><span><input type="checkbox" name="published" style="width:auto" checked> List these files in the public Gallery</span></label>' +
-    '<button class="b primary" id="media-upload-btn">Upload selected files</button>' +
-    '<p id="media-progress" class="muted" role="status" aria-live="polite"></p></form>' +
-    '<section aria-labelledby="media-list-heading">' +
-      '<div class="bar" style="margin-top:24px"><h3 id="media-list-heading">Uploaded media</h3>' +
-        '<div class="actions">' +
-          '<input id="media-search" type="search" placeholder="Search display name" aria-label="Search media by name" style="max-width:220px">' +
-          '<select id="media-kind" aria-label="Filter media type"><option value="all">All media</option><option value="image">Images</option><option value="video">Videos</option></select>' +
-          '<select id="media-visibility" aria-label="Filter media visibility"><option value="all">Public and private</option><option value="public">Public only</option><option value="private">Private only</option></select>' +
-          '<select id="media-sort" aria-label="Sort media"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option></select>' +
-          '<button type="button" class="b" id="media-scan">Scan integrity</button>' +
-          '<button type="button" class="b" id="media-retry">Retry cleanup</button>' +
-        '</div>' +
-      '</div>' +
-      '<div id="media-integrity-report" class="item" aria-live="polite"></div>' +
-      '<div class="media-grid" id="media-grid" aria-live="polite"><p class="muted">Loading media…</p></div>' +
-      '<div class="bar" style="margin-top:18px"><span id="media-page-label" class="muted"></span>' +
-        '<div class="actions"><button type="button" class="b" id="media-prev" disabled>Previous</button><button type="button" class="b" id="media-next" disabled>Next</button></div>' +
-      '</div>' +
-    '</section>';
+    '<div class="hm-wrap">' +
+      '<header class="hm-hero"><div><p class="hm-eyebrow">Content management</p><h2>Media library</h2>' +
+        '<p class="hm-intro">Organise images and videos, edit the names shown in the public Gallery, and control whether a file is public or private. Renaming a display name never changes its original file or web address.</p></div>' +
+        '<div class="hm-hero-actions"><button type="button" class="hm-btn" id="media-scan">Check storage</button><button type="button" class="hm-btn" id="media-retry">Retry cleanup</button></div></header>' +
+      '<div class="hm-stats"><div class="hm-stat"><span>Files in library</span><strong id="media-stat-total">—</strong></div>' +
+        '<div class="hm-stat"><span>Images on this page</span><strong id="media-stat-images">—</strong></div>' +
+        '<div class="hm-stat"><span>Videos on this page</span><strong id="media-stat-videos">—</strong></div></div>' +
+      '<section class="hm-upload"><div class="hm-section-title"><div><h3>Add new media</h3><p>Upload photos or videos, individually or in a ZIP archive.</p></div></div>' +
+        '<form id="mediaform"><div class="hm-upload-grid">' +
+          '<label class="hm-dropzone" id="media-dropzone"><strong>Select or drop photos, videos or ZIP files</strong><small>JPEG, PNG, WebP, GIF, MP4, WebM and MOV · max 50 MB per file</small><input id="media-files" name="files" type="file" accept=".zip,application/zip,image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime" multiple required hidden><span class="hm-file-name" id="media-selection">No files selected</span></label>' +
+          '<label class="hm-form-field">Category<select name="category">' + categoryOptions("auto", true) + '</select></label>' +
+          '<label class="hm-form-field">Gallery caption<input name="caption" maxlength="1000" placeholder="Optional description"></label>' +
+        '</div><div class="hm-upload-footer"><label class="hm-check"><input type="checkbox" name="published" checked> Publish to public Gallery</label>' +
+          '<button type="submit" class="hm-btn hm-btn-primary" id="media-upload-btn">Upload files</button></div>' +
+          '<p class="hm-progress" id="media-progress" role="status" aria-live="polite"></p></form></section>' +
+      '<section class="hm-library"><div class="hm-section-title"><div><h3>Uploaded media</h3><p>Search, filter and update the details shown to visitors.</p></div><span id="media-count" class="hm-page-info">Loading…</span></div>' +
+        '<div class="hm-toolbar"><label class="hm-form-field hm-search"><span class="hidden">Search by display name</span><input id="media-search" type="search" placeholder="Search display names…" aria-label="Search media by display name"></label>' +
+          '<label class="hm-form-field">Media type<select id="media-kind"><option value="all">All media</option><option value="image">Images</option><option value="video">Videos</option></select></label>' +
+          '<label class="hm-form-field">Visibility<select id="media-visibility"><option value="all">Public and private</option><option value="public">Public only</option><option value="private">Private only</option></select></label>' +
+          '<label class="hm-form-field">Sort by<select id="media-sort"><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="name">Name A–Z</option></select></label></div>' +
+        '<div id="media-integrity-report" style="margin-bottom:14px" aria-live="polite"></div>' +
+        '<div class="hm-grid" id="media-grid" aria-live="polite"><div class="hm-skeleton"></div><div class="hm-skeleton"></div><div class="hm-skeleton"></div></div>' +
+        '<div class="hm-pagination" id="media-pagination"></div></section></div>';
 
   const fileInput = $("#media-files");
   const dropzone = $("#media-dropzone");
   const selection = $("#media-selection");
   const showSelection = () => {
     const files = Array.from(fileInput.files || []);
-    const size = files.reduce((sum, file) => sum + file.size, 0);
     selection.textContent = files.length
-      ? files.length + " file(s) selected · " + (size / 1024 / 1024).toFixed(2) + " MB total"
-      : "No files selected yet.";
+      ? files.length + " file(s) · " + (files.reduce((sum, file) => sum + file.size, 0) / 1024 / 1024).toFixed(1) + " MB"
+      : "No files selected";
   };
   fileInput.onchange = showSelection;
+  dropzone.onclick = (event) => { if (event.target !== fileInput) fileInput.click(); };
   dropzone.ondragover = (event) => { event.preventDefault(); dropzone.classList.add("dragging"); };
   dropzone.ondragleave = () => dropzone.classList.remove("dragging");
   dropzone.ondrop = (event) => {
@@ -119,7 +392,6 @@ async function loadMedia() {
     fileInput.files = transfer.files;
     showSelection();
   };
-
   $("#mediaform").onsubmit = async (event) => {
     event.preventDefault();
     const form = new FormData(event.target);
@@ -128,278 +400,80 @@ async function loadMedia() {
     const caption = String(form.get("caption") || "").trim();
     const published = form.has("published");
     const progress = $("#media-progress");
-    const uploadButton = $("#media-upload-btn");
-    if (!selected.length) { progress.textContent = "Select at least one file or ZIP archive."; return; }
-    uploadButton.disabled = true;
+    const button = $("#media-upload-btn");
+    if (!selected.length) { progress.textContent = "Choose at least one file."; return; }
+    button.disabled = true;
     try {
       const files = await expandMediaSelection(selected);
-      if (!files.length) throw new Error("No supported images or videos were found in that ZIP.");
+      if (!files.length) throw new Error("No supported photos or videos were found.");
       let complete = 0;
       progress.textContent = "Uploading 0 of " + files.length + "…";
       for (const file of files) {
         let asset = null;
         try {
           const chosen = category === "auto" ? guessCategory(file.name) : category;
-          const bucket = published ? MEDIA_BUCKET : PRIVATE_MEDIA_BUCKET;
-          asset = await uploadToStorage(file, chosen, bucket);
+          asset = await uploadToStorage(file, chosen, published ? MEDIA_BUCKET : PRIVATE_MEDIA_BUCKET);
           const { error } = await db.from("media_assets").insert({
-            filename: asset.filename,
-            display_name: asset.filename,
-            alt_text: "",
-            storage_path: asset.path,
-            storage_bucket: asset.bucket,
-            public_url: asset.url,
-            caption,
-            category: chosen,
-            media_type: asset.type,
-            mime_type: asset.mime_type,
-            size_bytes: asset.size_bytes,
-            is_published: published,
+            filename: asset.filename, display_name: asset.filename, alt_text: "",
+            storage_path: asset.path, storage_bucket: asset.bucket, public_url: asset.url,
+            caption, category: chosen, media_type: asset.type, mime_type: asset.mime_type,
+            size_bytes: asset.size_bytes, is_published: published,
           });
           if (error) throw error;
           complete++;
-          progress.textContent = "Uploaded " + complete + " of " + files.length + ": " + file.name;
+          progress.textContent = "Uploaded " + complete + " of " + files.length + " · " + file.name;
         } catch (error) {
           if (asset) {
-            try {
-              await hopeCleanupDetachedObject(asset.bucket, asset.path);
-            } catch (cleanupError) {
-              progress.textContent = "Upload failed and cleanup is pending. Run an integrity scan or retry cleanup. " +
-                (cleanupError?.message || String(cleanupError));
-            }
+            try { await hopeCleanupDetachedObject(asset.bucket, asset.path); }
+            catch (cleanupError) { progress.textContent += " Cleanup is pending: " + cleanupError.message; }
           }
           throw error;
         }
       }
       say("Uploaded " + complete + " file(s).");
-      await loadMedia();
+      fileInput.value = "";
+      showSelection();
+      progress.textContent = "Upload complete.";
+      await hopeLoadMediaPage();
     } catch (error) {
-      progress.textContent = "Upload stopped: " + (error?.message || String(error));
-      say("Upload error: " + (error?.message || String(error)));
-      uploadButton.disabled = false;
-    }
-  };
-
-  const refresh = async () => {
-    await hopeLoadMediaPage();
-  };
-  $("#media-search").oninput = () => {
-    hopeMediaState.query = $("#media-search").value.trim();
-    hopeMediaState.page = 0;
-    refresh();
-  };
-  $("#media-kind").onchange = () => { hopeMediaState.type = $("#media-kind").value; hopeMediaState.page = 0; refresh(); };
-  $("#media-visibility").onchange = () => { hopeMediaState.visibility = $("#media-visibility").value; hopeMediaState.page = 0; refresh(); };
-  $("#media-sort").onchange = () => { hopeMediaState.sort = $("#media-sort").value; hopeMediaState.page = 0; refresh(); };
-  $("#media-prev").onclick = () => { if (hopeMediaState.page > 0) { hopeMediaState.page--; refresh(); } };
-  $("#media-next").onclick = () => {
-    if ((hopeMediaState.page + 1) * hopeMediaState.pageSize < hopeMediaState.count) {
-      hopeMediaState.page++;
-      refresh();
-    }
-  };
-  $("#media-scan").onclick = async () => {
-    const button = $("#media-scan");
-    button.disabled = true;
-    try {
-      const result = await hopeMediaAction({ action: "scan" });
-      hopeMediaState.report = result.report;
-      hopeRenderMediaReport();
-      say("Media integrity scan completed. No files were deleted.");
-    } catch (error) {
-      say("Integrity scan failed: " + (error?.message || String(error)));
+      progress.textContent = "Upload stopped: " + (error.message || String(error));
+      say("Upload error: " + (error.message || String(error)));
     } finally { button.disabled = false; }
   };
+
+  let searchTimer = null;
+  $("#media-search").oninput = () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      hopeMediaState.query = $("#media-search").value.trim();
+      hopeMediaState.page = 0;
+      hopeLoadMediaPage();
+    }, 260);
+  };
+  $("#media-search").onkeydown = (event) => {
+    if (event.key === "Enter") {
+      clearTimeout(searchTimer);
+      hopeMediaState.query = event.target.value.trim();
+      hopeMediaState.page = 0;
+      hopeLoadMediaPage();
+    }
+  };
+  $("#media-kind").onchange = () => { hopeMediaState.type = $("#media-kind").value; hopeMediaState.page = 0; hopeLoadMediaPage(); };
+  $("#media-visibility").onchange = () => { hopeMediaState.visibility = $("#media-visibility").value; hopeMediaState.page = 0; hopeLoadMediaPage(); };
+  $("#media-sort").onchange = () => { hopeMediaState.sort = $("#media-sort").value; hopeMediaState.page = 0; hopeLoadMediaPage(); };
+  $("#media-scan").onclick = hopeMediaRunScan;
   $("#media-retry").onclick = async () => {
     const button = $("#media-retry");
     button.disabled = true;
     try {
-      const result = await hopeMediaAction({ action: "retry_cleanup" });
-      say("Cleanup retry finished: " + result.completed + " of " + result.attempted + " job(s) completed.");
-      await loadMedia();
+      const { data, error } = await db.functions.invoke("admin-media", { body: { action: "retry_cleanup" } });
+      if (error) throw error;
+      if (!data || data.ok !== true) throw new Error(data?.message || "Cleanup retry failed.");
+      say("Cleanup checked " + data.attempted + " job(s); " + data.completed + " completed.");
+      await hopeLoadMediaPage();
     } catch (error) {
-      say("Cleanup retry failed: " + (error?.message || String(error)));
+      say("Cleanup retry failed: " + (error.message || String(error)));
     } finally { button.disabled = false; }
   };
-
   await hopeLoadMediaPage();
-}
-
-async function hopeLoadMediaPage() {
-  const grid = $("#media-grid");
-  if (!grid) return;
-  grid.innerHTML = '<p class="muted">Loading media…</p>';
-  const first = hopeMediaState.page * hopeMediaState.pageSize;
-  let query = db.from("media_assets").select("*", { count: "exact" });
-  if (hopeMediaState.query) {
-    query = query.ilike("display_name", "%" + hopeMediaEscapeLike(hopeMediaState.query) + "%");
-  }
-  if (hopeMediaState.type !== "all") query = query.eq("media_type", hopeMediaState.type);
-  if (hopeMediaState.visibility !== "all") {
-    query = query.eq("is_published", hopeMediaState.visibility === "public");
-  }
-  if (hopeMediaState.sort === "name") {
-    query = query.order("display_name", { ascending: true }).order("id", { ascending: true });
-  } else {
-    query = query.order("created_at", { ascending: hopeMediaState.sort === "oldest" }).order("id", { ascending: true });
-  }
-  const { data, error, count } = await query.range(first, first + hopeMediaState.pageSize - 1);
-  if (error) throw error;
-  hopeMediaState.rows = data || [];
-  hopeMediaState.count = count || 0;
-
-  const visible = await Promise.all(hopeMediaState.rows.map(async (asset) => {
-    const bucket = asset.storage_bucket || MEDIA_BUCKET;
-    let displayUrl = bucket === MEDIA_BUCKET ? asset.public_url : null;
-    let previewError = false;
-    if (bucket === PRIVATE_MEDIA_BUCKET) {
-      const { data: signed, error: signError } = await db.storage.from(bucket).createSignedUrl(asset.storage_path, 300);
-      if (signError) previewError = true;
-      else displayUrl = signed?.signedUrl || null;
-    }
-    return { ...asset, display_url: displayUrl, preview_error: previewError };
-  }));
-
-  $("#media-count").textContent = hopeMediaState.count + " file(s)";
-  grid.innerHTML = visible.length
-    ? visible.map(hopeMediaCard).join("")
-    : '<p class="muted">No media matches these filters.</p>';
-  grid.querySelectorAll("[data-media-preview]").forEach((preview) => {
-    preview.addEventListener("error", () => {
-      const fallback = document.createElement("div");
-      fallback.className = "media-preview";
-      fallback.setAttribute("role", "img");
-      fallback.textContent = "Preview unavailable";
-      preview.replaceWith(fallback);
-    }, { once: true });
-  });
-  const pageCount = Math.max(1, Math.ceil(hopeMediaState.count / hopeMediaState.pageSize));
-  $("#media-page-label").textContent = "Page " + (hopeMediaState.page + 1) + " of " + pageCount;
-  $("#media-prev").disabled = hopeMediaState.page === 0;
-  $("#media-next").disabled = (hopeMediaState.page + 1) * hopeMediaState.pageSize >= hopeMediaState.count;
-  $("#media-grid").querySelectorAll("[data-savemedia]").forEach((button) => {
-    button.onclick = async () => {
-      const id = button.dataset.savemedia;
-      const asset = hopeMediaState.rows.find((row) => row.id === id);
-      if (!asset) return;
-      button.disabled = true;
-      try {
-        const displayName = hopeMediaValidateText($("#media [data-mdname='" + id + "']").value, 180, "Display name");
-        const altText = String($("#media [data-malt='" + id + "']").value || "").trim();
-        const caption = String($("#media [data-mcaption='" + id + "']").value || "").trim();
-        if (altText.length > 500 || caption.length > 1000) throw new Error("Alt text or caption is too long.");
-        const category = $("#media [data-mcat='" + id + "']").value;
-        if (!MEDIA_CATEGORIES.includes(category)) throw new Error("Choose a valid category.");
-        const { error } = await db.from("media_assets").update({
-          display_name: displayName,
-          alt_text: altText,
-          caption,
-          category,
-          updated_at: new Date().toISOString(),
-        }).eq("id", id);
-        if (error) throw error;
-
-        const desiredPublished = $("#media [data-mpublished='" + id + "']").value === "true";
-        if (desiredPublished !== asset.is_published) {
-          const result = await hopeMediaAction({ action: "set_visibility", asset_id: id, is_published: desiredPublished });
-          say(result.message || "Media details saved.");
-        } else {
-          say("Media details saved. The original filename and Storage object path were preserved.");
-        }
-        await hopeLoadMediaPage();
-      } catch (error) {
-        if (error?.data?.moved) {
-          say(error.data.message + " Media details and visibility were saved; retry cleanup to remove the old object.");
-          await hopeLoadMediaPage();
-        } else {
-          say("Media metadata was saved, but Gallery visibility was not changed: " + (error?.message || String(error)));
-          button.disabled = false;
-        }
-      }
-    };
-  });
-  $("#media-grid").querySelectorAll("[data-delmedia]").forEach((button) => {
-    button.onclick = async () => {
-      const id = button.dataset.delmedia;
-      if (!confirm("Delete this media asset and its Storage object permanently? The server will first check every post, including drafts, and public settings.")) return;
-      button.disabled = true;
-      try {
-        const result = await hopeMediaAction({ action: "delete_asset", asset_id: id });
-        say(result.message || "Media deleted.");
-        await hopeLoadMediaPage();
-      } catch (error) {
-        say("Deletion did not fully complete or was blocked. Check the cleanup queue and retry after resolving any references: " + (error?.message || String(error)));
-        button.disabled = false;
-        await hopeLoadMediaPage();
-      }
-    };
-  });
-  if (hopeMediaState.report) hopeRenderMediaReport();
-}
-
-function hopeRenderMediaReport() {
-  const target = $("#media-integrity-report");
-  const report = hopeMediaState.report;
-  if (!target || !report) return;
-  const orphans = Array.isArray(report.orphaned_objects) ? report.orphaned_objects : [];
-  const referenced = Array.isArray(report.referenced_unregistered_objects) ? report.referenced_unregistered_objects : [];
-  const broken = Array.isArray(report.broken_records) ? report.broken_records : [];
-  target.innerHTML =
-    '<h4>Storage integrity report</h4><p class="muted">Checked ' + esc(new Date(report.checked_at).toLocaleString()) +
-    ' · ' + orphans.length + ' unreferenced/unregistered object(s) · ' + referenced.length + ' referenced/unregistered object(s) · ' + broken.length + ' broken media record(s). This scan does not delete anything.</p>' +
-    (orphans.length
-      ? '<h5>Unregistered Storage objects</h5>' + orphans.map((item, index) =>
-        '<div class="item"><span>' + esc(item.bucket) + ' / ' + esc(item.path) + '</span> ' +
-        '<button type="button" class="b danger" data-queue-orphan="' + index + '">Queue deletion</button></div>'
-      ).join("")
-      : '<p class="muted">No unreferenced orphaned Storage objects detected.</p>') +
-    (referenced.length
-      ? '<h5>Unregistered but referenced Storage objects</h5><p class="muted">These objects may still be used by posts or public settings. They are excluded from cleanup until the references are reviewed.</p>' +
-        referenced.map((item) => '<div class="item">' + esc(item.bucket) + ' / ' + esc(item.path) + '</div>').join("")
-      : '<p class="muted">No referenced, unregistered Storage objects detected.</p>') +
-    (broken.length
-      ? '<h5>Media records with missing Storage objects</h5>' + broken.map((item, index) =>
-        '<div class="item"><span>' + esc(item.display_name || item.path) + ' · ' + esc(item.bucket) + ' / ' + esc(item.path) + '</span> ' +
-        (item.is_referenced
-          ? '<span class="muted">Referenced by content — not eligible for removal</span>'
-          : '<button type="button" class="b danger" data-remove-broken="' + index + '">Remove broken record</button>') + '</div>'
-      ).join("")
-      : '<p class="muted">No broken media records detected.</p>');
-
-  target.querySelectorAll("[data-queue-orphan]").forEach((button) => {
-    button.onclick = async () => {
-      const item = orphans[Number(button.dataset.queueOrphan)];
-      if (!item || !confirm("Queue permanent deletion of " + item.bucket + " / " + item.path + "? A second server-side reference check runs before deletion.")) return;
-      button.disabled = true;
-      try {
-        const result = await hopeMediaAction({ action: "queue_orphan_delete", bucket: item.bucket, path: item.path });
-        say(result.message || "Orphan cleanup completed.");
-        const scan = await hopeMediaAction({ action: "scan" });
-        hopeMediaState.report = scan.report;
-        hopeRenderMediaReport();
-        await hopeLoadMediaPage();
-      } catch (error) {
-        say("Orphan was not deleted: " + (error?.message || String(error)));
-        button.disabled = false;
-      }
-    };
-  });
-  target.querySelectorAll("[data-remove-broken]").forEach((button) => {
-    button.onclick = async () => {
-      const item = broken[Number(button.dataset.removeBroken)];
-      if (!item || !confirm("Remove the broken database record? The server will block this if a post or public setting still refers to it.")) return;
-      button.disabled = true;
-      try {
-        const result = await hopeMediaAction({ action: "delete_asset", asset_id: item.id });
-        say(result.message || "Broken media record removed.");
-        const scan = await hopeMediaAction({ action: "scan" });
-        hopeMediaState.report = scan.report;
-        hopeRenderMediaReport();
-        await hopeLoadMediaPage();
-      } catch (error) {
-        say("Broken record was not removed: " + (error?.message || String(error)));
-        button.disabled = false;
-      }
-    };
-  });
 }
