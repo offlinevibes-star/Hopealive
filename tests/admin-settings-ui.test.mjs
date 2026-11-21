@@ -38,7 +38,7 @@ test("site content arrays can be added and removed without losing the draft", ()
 });
 
 test("settings save is validated and persists through the existing protected table", () => {
-  assert.match(settingsSource, /const allowed=\['email','phone','whatsapp','social','bank','donateLink','formspree','hero','giscus','stats','gallery','team','turnstileSiteKey'\]/);
+  assert.match(settingsSource, /const allowed=\['email','phone','whatsapp','social','bank','donateLink','formspree','hero','giscus','stats','gallery','team','turnstileSiteKey','content'\]/);
   assert.match(settingsSource, /new URL\(value,location\.origin\)/);
   assert.match(settingsSource, /db\.from\('site_settings'\)\.upsert/);
   assert.match(settingsSource, /Save changes/);
@@ -54,7 +54,8 @@ test("settings editor includes editable homepage, gallery, team and contact fiel
 
 test("main site headings and page copy are editable from settings", () => {
   assert.match(settingsSource, /Main website text/);
-  assert.match(settingsSource, /content\.homeHeroTitle/);
+  assert.match(settingsSource, /homeHeroTitle/);
+  assert.match(settingsSource, /field\(label,'content\.'\+key/);
   assert.match(settingsSource, /content\.contactIntro/);
   assert.match(settingsSource, /content\.volunteerText/);
   assert.match(siteJs, /const applySiteContent/);
