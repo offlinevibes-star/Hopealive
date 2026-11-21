@@ -5,7 +5,7 @@
 .hm-hero h2{max-width:none;margin:0;font-size:clamp(27px,3vw,36px);letter-spacing:-.04em}
 .hm-intro{margin:9px 0 0;max-width:68ch;color:#64708a;font-size:14px;line-height:1.55}
 .hm-hero-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
-.hm-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:9px 15px;border:1px solid #d8dfeb;border-radius:12px;background:#fff;color:#26334f;font:700 13px/1.2 inherit;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
+.hm-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:9px 15px;border:1px solid #d8dfeb;border-radius:12px;background:#fff;color:#26334f;font-family:inherit;font-size:13px;font-weight:700;line-height:1.2;cursor:pointer;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease}
 .hm-btn:hover:not(:disabled){transform:translateY(-1px);border-color:#aebbd2;box-shadow:0 7px 18px #1c2e5012}
 .hm-btn:disabled{opacity:.45;cursor:not-allowed}
 .hm-btn-primary{border-color:#252f60;background:#252f60;color:#fff}
@@ -69,7 +69,7 @@
 .hm-pagination{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:20px;padding-top:16px;border-top:1px solid #edf0f5}
 .hm-page-info{color:#75819a;font-size:12px;font-weight:600}
 .hm-page-buttons{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
-.hm-page-button{min-width:36px;height:36px;padding:0 9px;border:1px solid #dfe5ef;border-radius:10px;background:#fff;color:#4d5b77;font:700 12px inherit;cursor:pointer}
+.hm-page-button{min-width:36px;height:36px;padding:0 9px;border:1px solid #dfe5ef;border-radius:10px;background:#fff;color:#4d5b77;font-family:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .hm-page-button[aria-current="page"]{border-color:#2a376c;background:#2a376c;color:#fff}
 .hm-page-button:disabled{opacity:.4;cursor:not-allowed}
 .hm-page-ellipsis{padding:0 4px;color:#98a2b5}
