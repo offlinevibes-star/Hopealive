@@ -36,7 +36,7 @@ B.insertAdjacentHTML('beforeend',`<footer><div class="wrap"><a class="logo" href
 const bg=$('#bg'),menu=$('#menu'),lb=$('#lb');
 bg.onclick=()=>bg.setAttribute('aria-expanded',menu.classList.toggle('open'));
 menu.onclick=e=>{if(e.target.matches('a')){menu.classList.remove('open');bg.setAttribute('aria-expanded','false')}};
-let gi=0,galleryItems=C.gallery.slice(),gallerySlideTimer=null,galleryPlaying=false,lastGalleryFocus=null;
+let gi=0,galleryItems=C.gallery.slice(),gallerySlideTimer=null,galleryPlaying=false,lastGalleryFocus=null,galleryScrollBefore='';
 const stopGallerySlideshow=()=>{
  if(gallerySlideTimer!==null)clearInterval(gallerySlideTimer);
  gallerySlideTimer=null;galleryPlaying=false;
@@ -49,7 +49,7 @@ const findNextGalleryImage=(from,direction)=>{
 };
 const show=i=>{
  const n=galleryItems.length;if(!n)return;
- if(!lb.classList.contains('on'))lastGalleryFocus=document.activeElement;
+ if(!lb.classList.contains('on')){lastGalleryFocus=document.activeElement;galleryScrollBefore=B.style.overflow;B.style.overflow='hidden'}
  gi=(i+n)%n;
  const item=galleryItems[gi],image=lb.querySelector('.lb-image'),video=lb.querySelector('.lb-video');
  if(item.type==='video'){
@@ -67,7 +67,7 @@ const show=i=>{
 const closeGalleryViewer=()=>{
  stopGallerySlideshow();
  const video=lb.querySelector('.lb-video');video.pause();video.removeAttribute('src');video.load();video.hidden=true;
- lb.classList.remove('on');lb.setAttribute('aria-hidden','true');
+ lb.classList.remove('on');lb.setAttribute('aria-hidden','true');B.style.overflow=galleryScrollBefore;
  if(lastGalleryFocus&&typeof lastGalleryFocus.focus==='function')lastGalleryFocus.focus();
 };
 const toggleGallerySlideshow=()=>{
