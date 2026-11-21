@@ -79,8 +79,10 @@ test("HopeAlive admin browser smoke: login, paginated media view and audit-indep
     await page.locator("#media-grid").waitFor({ state: "visible", timeout: 20000 });
     assert.equal(await page.locator("#media-search").count(), 1);
     assert.equal(await page.locator("#media-visibility").count(), 1);
-    assert.equal(await page.locator("#media-prev").count(), 1);
-    assert.equal(await page.locator("#media-next").count(), 1);
+    assert.equal(await page.locator("#media-pagination").count(), 1);
+    assert.ok(await page.locator("#media-pagination .hm-page-button").count() >= 2);
+    assert.equal(await page.locator("#media-sort").count(), 1);
+    assert.equal(await page.locator("#media-kind").count(), 1);
 
     await page.locator("#logout").click();
     await page.locator("#login:not(.hidden)").waitFor({ state: "visible", timeout: 10000 });
