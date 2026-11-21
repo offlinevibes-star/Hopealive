@@ -130,6 +130,9 @@ test("destructive media operations are admin-gated and retryable", () => {
 
 test("contact validation and layered limits use hashed global, email and optional IP keys", () => {
   assert.match(edge, /consume_contact_rate_limit_v2/);
+  assert.ok(edge.indexOf("globalHash, 300") < edge.indexOf("if (turnstileSecret)"));
+  assert.ok(edge.indexOf("if (turnstileSecret)") < edge.indexOf("consumeLimit(service, emailHash, 5)"));
+  assert.ok(edge.indexOf("if (turnstileSecret)") < edge.indexOf('suspicious("email_limit", req)'));
   assert.match(edge, /global:contact:/);
   assert.match(edge, /email:/);
   assert.match(edge, /ip:/);
