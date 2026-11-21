@@ -45,7 +45,7 @@ test("settings save is validated and persists through the existing protected tab
 });
 
 test("settings editor includes editable homepage, gallery, team and contact fields", () => {
-  for (const label of ["Public contact email", "Homepage image URL", "Gallery items", "Trustees &amp; team", "Donation details", "Social profiles"]) {
+  for (const label of ["Public contact email", "Main homepage image URL", "Gallery items", "Trustees &amp; team", "Donation details", "Social profiles"]) {
     assert.ok(settingsSource.includes(label), "missing settings section: " + label);
   }
   assert.match(settingsSource, /@media\(max-width:850px\)/);
