@@ -73,7 +73,7 @@ test("media display names and alt text are editable without changing Storage pat
   assert.match(adminMedia, /createSignedUrl\(asset\.storage_path, 300\)/);
   assert.match(adminMedia, /display_name:/);
   assert.match(adminMedia, /alt_text:/);
-  assert.match(adminMedia, /display-name edits never change media URLs or video playback/);
+  assert.match(adminMedia, /Renaming a display name never changes its original file or web address/);
   assert.match(site, /cap:m\.display_name\|\|m\.filename/);
   assert.match(site, /alt:m\.alt_text\|\|m\.display_name/);
 });
