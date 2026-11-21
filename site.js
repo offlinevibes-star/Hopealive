@@ -32,21 +32,11 @@ const PIL=[
 ['--sky','Holistic transformation','Offering education, empowerment and exposure to innovation for youth and disadvantaged communities.']];
 document.head.insertAdjacentHTML('beforeend','<meta name="theme-color" content="#ffc233"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 32 32\'%3E%3Ccircle cx=\'16\' cy=\'16\' r=\'14\' fill=\'%23ffc233\' stroke=\'%2314143c\' stroke-width=\'3\'/%3E%3C/svg%3E">');
 B.insertAdjacentHTML('afterbegin',`<svg width="0" height="0" style="position:absolute" aria-hidden="true">${['<path d="M0 100V0a100 100 0 0 1 100 100z"/>','<circle cx="50" cy="50" r="50"/>','<path d="M0 100V50a50 50 0 0 1 100 0v50z"/>','<path d="M0 100C0 45 45 0 100 0c0 55-45 100-100 100z"/>','<path d="M50 0c5 35 15 45 50 50-35 5-45 15-50 50-5-35-15-45-50-50 35-5 45-15 50-50z"/>'].map((s,i)=>`<symbol id="s${i+1}" viewBox="0 0 100 100" fill="currentColor">${s}</symbol>`).join('')}</svg><a class="skip" href="#main">Skip to content</a><header><div class="wrap"><nav aria-label="Main"><a class="logo" href="index.html"><span class="dot"></span>HopeAlive</a><button id="bg" aria-expanded="false" aria-controls="menu">Menu</button><ul id="menu">${NAV.map(([f,t])=>`<li><a href="${f}.html"${f==pg||(f=='blog'&&pg=='post')?' aria-current="page"':''}>${t}</a></li>`).join('')}<li><a class="btn" href="get-involved.html">Donate</a></li></ul></nav></div></header>`);
-B.insertAdjacentHTML('beforeend',`<footer><div class="wrap"><a class="logo" href="index.html"><span class="dot"></span>HopeAlive</a><p><b>HopeAlive Foundation for Education and Community Development</b></p><p>Incorporated Trustees, CAC IT No. 8700520</p><p>Tax ID (TIN): 33447613-0001</p><p>No 8, Umuozuo Street, Aba, Abia State, Nigeria</p><p class="fl">${NAV.concat([['get-involved','Get involved']]).map(([f,t])=>`<a href="${f}.html">${t}</a>`).join('')}</p><p>&copy; ${new Date().getFullYear()} HopeAlive Foundation. Not-for-profit and non-political.</p></div></footer><div id="lb" class="gallery-viewer" role="dialog" aria-modal="true" aria-label="Gallery slideshow" aria-hidden="true"><div class="viewer-shell"><button class="x viewer-close" type="button" aria-label="Close slideshow">&times;</button><div class="viewer-stage"><button class="pv viewer-arrow" type="button" aria-label="Previous item">&lsaquo;</button><div class="viewer-media"><img class="lb-image" alt=""><video class="lb-video" controls playsinline preload="metadata" hidden></video></div><button class="nx viewer-arrow" type="button" aria-label="Next item">&rsaquo;</button></div><div class="viewer-footer"><div class="viewer-caption"><p id="lc"></p><span id="lb-count"></span></div><button id="lb-toggle" class="viewer-play" type="button">Play slideshow</button></div></div></div>`);
+B.insertAdjacentHTML('beforeend',`<footer><div class="wrap"><a class="logo" href="index.html"><span class="dot"></span>HopeAlive</a><p><b>HopeAlive Foundation for Education and Community Development</b></p><p>Incorporated Trustees, CAC IT No. 8700520</p><p>Tax ID (TIN): 33447613-0001</p><p>No 8, Umuozuo Street, Aba, Abia State, Nigeria</p><p class="fl">${NAV.concat([['get-involved','Get involved']]).map(([f,t])=>`<a href="${f}.html">${t}</a>`).join('')}</p><p>&copy; ${new Date().getFullYear()} HopeAlive Foundation. Not-for-profit and non-political.</p></div></footer><div id="lb" class="gallery-viewer" role="dialog" aria-modal="true" aria-label="Gallery viewer" aria-hidden="true"><div class="viewer-shell"><button class="x viewer-close" type="button" aria-label="Close slideshow">&times;</button><div class="viewer-stage"><button class="pv viewer-arrow" type="button" aria-label="Previous item">&lsaquo;</button><div class="viewer-media"><img class="lb-image" alt=""><video class="lb-video" controls playsinline preload="metadata" hidden></video></div><button class="nx viewer-arrow" type="button" aria-label="Next item">&rsaquo;</button></div><div class="viewer-footer"><div class="viewer-caption"><p id="lc"></p><span id="lb-count"></span></div></div></div></div>`);
 const bg=$('#bg'),menu=$('#menu'),lb=$('#lb');
 bg.onclick=()=>bg.setAttribute('aria-expanded',menu.classList.toggle('open'));
 menu.onclick=e=>{if(e.target.matches('a')){menu.classList.remove('open');bg.setAttribute('aria-expanded','false')}};
-let gi=0,galleryItems=C.gallery.slice(),gallerySlideTimer=null,galleryPlaying=false,lastGalleryFocus=null,galleryScrollBefore='';
-const stopGallerySlideshow=()=>{
- if(gallerySlideTimer!==null)clearInterval(gallerySlideTimer);
- gallerySlideTimer=null;galleryPlaying=false;
- const button=$('#lb-toggle');if(button)button.textContent='Play slideshow';
-};
-const findNextGalleryImage=(from,direction)=>{
- const n=galleryItems.length;
- for(let step=1;step<=n;step++){const index=(from+direction*step+n)%n;if(galleryItems[index]&&galleryItems[index].type!=='video')return index}
- return -1;
-};
+let gi=0,galleryItems=C.gallery.slice(),lastGalleryFocus=null,galleryScrollBefore='';
 const show=i=>{
  const n=galleryItems.length;if(!n)return;
  if(!lb.classList.contains('on')){lastGalleryFocus=document.activeElement;galleryScrollBefore=B.style.overflow;B.style.overflow='hidden'}
@@ -65,20 +55,9 @@ const show=i=>{
  if(lastGalleryFocus&&typeof lb.querySelector('.viewer-close').focus==='function')lb.querySelector('.viewer-close').focus();
 };
 const closeGalleryViewer=()=>{
- stopGallerySlideshow();
  const video=lb.querySelector('.lb-video');video.pause();video.removeAttribute('src');video.load();video.hidden=true;
  lb.classList.remove('on');lb.setAttribute('aria-hidden','true');B.style.overflow=galleryScrollBefore;
  if(lastGalleryFocus&&typeof lastGalleryFocus.focus==='function')lastGalleryFocus.focus();
-};
-const toggleGallerySlideshow=()=>{
- if(galleryPlaying){stopGallerySlideshow();return}
- if(!galleryItems.some(item=>item.type!=='video'))return;
- galleryPlaying=true;$('#lb-toggle').textContent='Pause slideshow';
- gallerySlideTimer=setInterval(()=>{
-  const next=findNextGalleryImage(gi,1);
-  if(next<0){stopGallerySlideshow();return}
-  show(next);
- },4500);
 };
 document.onclick=e=>{
  const t=e.target;
@@ -87,7 +66,6 @@ document.onclick=e=>{
  if(t.tagName==='IMG'&&t.dataset&&t.dataset.i!==undefined){show(Number(t.dataset.i));return}
  if(t.closest&&t.closest('.pv')){show(gi-1);return}
  if(t.closest&&t.closest('.nx')){show(gi+1);return}
- if(t.matches&&t.matches('#lb-toggle')){toggleGallerySlideshow();return}
  if(t.matches&&t.matches('.cp')){navigator.clipboard.writeText(t.dataset.c);t.textContent='Copied';return}
  if(t===lb||t.matches&&t.matches('.x'))closeGalleryViewer();
 };
@@ -96,7 +74,6 @@ document.onkeydown=e=>{
  if(e.key==='Escape'){closeGalleryViewer();return}
  if(e.key==='ArrowLeft'){e.preventDefault();show(gi-1);return}
  if(e.key==='ArrowRight'){e.preventDefault();show(gi+1);return}
- if(e.code==='Space'&&e.target===document.body){e.preventDefault();toggleGallerySlideshow()}
 };
 let tx=0;lb.ontouchstart=e=>{tx=e.touches[0].clientX};lb.ontouchend=e=>{const d=e.changedTouches[0].clientX-tx;if(Math.abs(d)>50)show(gi+(d<0?1:-1))};
 (async()=>{
@@ -116,6 +93,44 @@ const galleryPageNumbers=(current,total)=>{
  if(start>2)pages.push('…');for(let page=start;page<=end;page++)pages.push(page);
  if(end<total-1)pages.push('…');pages.push(total);return pages;
 };
+const initGalleryShowcase=()=>{
+ const root=$('#gallery-slideshow');
+ if(!root)return;
+ const image=$('#gallery-slide-image'),heading=$('#gallery-slide-caption');
+ const description=$('#gallery-slide-description'),counter=$('#gallery-slide-count');
+ const photos=galleryItems.filter(item=>item.type!=='video'&&item.src);
+ if(!photos.length){root.hidden=true;return}
+ root.hidden=false;
+ let order=[],cursor=0,previous=-1;
+ const shuffleOrder=()=>{
+  order=photos.map((_,index)=>index);
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]]}
+  if(order.length>1&&order[0]===previous)[order[0],order[1]]=[order[1],order[0]];
+  cursor=0;
+ };
+ const rotateGalleryShowcase=()=>{
+  if(cursor>=order.length)shuffleOrder();
+  previous=order[cursor++];
+  const item=photos[previous];
+  image.src=IMG(item.src);
+  image.alt=item.alt||item.cap||item.category||'HopeAlive programme photo';
+  heading.textContent=item.cap||item.category||'HopeAlive programme';
+  description.textContent=item.description||'';
+  description.hidden=!item.description;
+  counter.textContent=cursor+' / '+photos.length;
+  image.classList.remove('is-changing');
+  void image.offsetWidth;
+  image.classList.add('is-changing');
+ };
+ shuffleOrder();
+ rotateGalleryShowcase();
+ const prefersReducedMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+ if(photos.length>1&&!prefersReducedMotion){
+  window.setInterval(()=>{
+   if(!document.hidden&&!root.matches(':hover')&&!root.contains(document.activeElement))rotateGalleryShowcase();
+  },6500);
+ }
+};
 const renderGallery=(filter=galleryFilter)=>{
  if(filter!==galleryFilter){galleryFilter=filter;galleryPage=0}
  const all=galleryItems.map((x,i)=>({x,i}));
@@ -132,9 +147,9 @@ const renderGallery=(filter=galleryFilter)=>{
  const card=v=>{
   const x=v.x,i=v.i,cap=x.cap||x.category||'HopeAlive programme';
   const media=x.type==='video'
-   ? '<video muted playsinline preload="metadata" src="'+escMedia(x.src)+'"></video><span class="gal-open-label"><span>▶</span> Watch video</span>'
-   : '<img src="'+escMedia(IMG(x.src))+'" alt="'+escMedia(x.alt||cap)+'" loading="lazy" decoding="async"><span class="gal-open-label"><span>↗</span> View slideshow</span>';
-  return '<figure class="'+(x.type==='video'?'gal-video':'gal-image')+'"><button type="button" class="gal-open" data-gallery-open="'+i+'" aria-label="'+(x.type==='video'?'Play video: ':'Open slideshow: ')+escMedia(cap)+'">'+media+'</button>'+(cap?'<figcaption>'+escMedia(cap)+(x.description?'<br><span>'+escMedia(x.description)+'</span>':'')+'</figcaption>':'')+'</figure>';
+   ? '<video muted playsinline preload="metadata" src="'+escMedia(x.src)+'"></video>'
+   : '<img src="'+escMedia(IMG(x.src))+'" alt="'+escMedia(x.alt||cap)+'" loading="lazy" decoding="async">';
+  return '<figure class="'+(x.type==='video'?'gal-video':'gal-image')+'"><button type="button" class="gal-open" data-gallery-open="'+i+'" aria-label="'+(x.type==='video'?'Watch video: ':'View photo: ')+escMedia(cap)+'">'+media+'</button>'+(cap?'<figcaption>'+escMedia(cap)+(x.description?'<br><span>'+escMedia(x.description)+'</span>':'')+'</figcaption>':'')+'</figure>';
  };
  set('#gal',visible.length?visible.map(card).join(''):'<div class="gallery-empty"><b>No moments to show here yet.</b><span>Choose another category or check back soon.</span></div>');
  const summary=$('#gallery-summary');
@@ -152,6 +167,7 @@ const renderGallery=(filter=galleryFilter)=>{
  }
 };
 renderGallery('All');
+initGalleryShowcase();
 const K=C.bank;
 set('#bank',(C.donateLink?`<p><a class="btn" href="${C.donateLink}" target="_blank" rel="noopener">Donate online</a></p>`:'')+(K.number?`<dl><dt>Bank</dt><dd>${K.bank}</dd><dt>Account name</dt><dd>${K.name}</dd><dt>Account number</dt><dd><b>${K.number}</b><button class="cp" data-c="${K.number}">Copy</button></dd></dl>`:C.donateLink?'':'<p>Email us and we’ll share our official account details.</p>'));
 const hd=$('.dice');
