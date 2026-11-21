@@ -67,7 +67,7 @@ async function contentIsReferenced(admin: ReturnType<typeof createClient>, bucke
   return data === true;
 }
 
-async function processJob(admin: ReturnType<typeof createClient>, jobId: string) {
+async function processJob(admin: ReturnType<typeof createClient>, jobId: string, actorId: string) {
   // Claim atomically in Postgres. A second worker cannot take a fresh "running"
   // job; stale jobs become eligible again after the retry timeout.
   const staleRunningBefore = new Date(Date.now() - 10 * 60 * 1000).toISOString();
@@ -112,9 +112,12 @@ async function processJob(admin: ReturnType<typeof createClient>, jobId: string)
     await removeObjectIdempotently(admin, job.storage_bucket, job.storage_path);
 
     if (job.operation === "delete_asset" && job.media_asset_id) {
-      const { error: deleteError } = await admin.from("media_assets")
-        .delete().eq("id", job.media_asset_id).eq("delete_pending", true);
+      const { data: finalized, error: deleteError } = await admin.rpc("finalize_media_asset_delete", {
+        p_job_id: jobId,
+        p_actor_id: actorId,
+      });
       if (deleteError) throw deleteError;
+      if (finalized !== true) throw new Error("Pending media metadata could not be finalized.");
     }
 
     const { error: doneError } = await admin.from("media_cleanup_jobs").update({
@@ -180,7 +183,9 @@ Deno.serve(async (req: Request) => {
   const action = body.action;
 
   if (action === "scan") {
-    const { data, error } = await authClient.rpc("get_media_integrity_report");
+    const { data, error } = await admin.rpc("get_media_integrity_report", {
+      p_actor_id: userData.user.id,
+    });
     if (error) return json({ ok: false, message: "Integrity scan failed: " + safeError(error) });
     return json({ ok: true, report: data });
   }
@@ -190,12 +195,15 @@ Deno.serve(async (req: Request) => {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(assetId)) {
       return json({ ok: false, message: "Invalid media identifier." }, 400);
     }
-    const { data: jobId, error } = await authClient.rpc("enqueue_media_asset_delete", { p_asset_id: assetId });
+    const { data: jobId, error } = await admin.rpc("enqueue_media_asset_delete", {
+      p_actor_id: userData.user.id,
+      p_asset_id: assetId,
+    });
     if (error) {
       const conflict = error.code === "23503" || /referenced|in use/i.test(error.message || "");
       return json({ ok: false, message: safeError(error) }, conflict ? 200 : 400);
     }
-    const outcome = await processJob(admin, jobId);
+    const outcome = await processJob(admin, jobId, userData.user.id);
     return json({
       ok: outcome.status === "completed",
       message: outcome.status === "completed"
@@ -213,11 +221,13 @@ Deno.serve(async (req: Request) => {
     if (![PUBLIC_BUCKET, PRIVATE_BUCKET].includes(bucket) || !path.trim() || path.length > 1024) {
       return json({ ok: false, message: "Invalid Storage object." }, 400);
     }
-    const { data: jobId, error } = await authClient.rpc("enqueue_media_orphan_delete", {
-      p_bucket: bucket, p_path: path,
+    const { data: jobId, error } = await admin.rpc("enqueue_media_orphan_delete", {
+      p_actor_id: userData.user.id,
+      p_bucket: bucket,
+      p_path: path,
     });
     if (error) return json({ ok: false, message: safeError(error) });
-    const outcome = await processJob(admin, jobId);
+    const outcome = await processJob(admin, jobId, userData.user.id);
     return json({
       ok: outcome.status === "completed",
       message: outcome.status === "completed"
@@ -246,7 +256,7 @@ Deno.serve(async (req: Request) => {
       .filter((job, index, all) => all.findIndex((item) => item.id === job.id) === index)
       .slice(0, 10);
     const results = [];
-    for (const job of jobs) results.push(await processJob(admin, job.id));
+    for (const job of jobs) results.push(await processJob(admin, job.id, userData.user.id));
     const completed = results.filter((item) => item.status === "completed").length;
     return json({
       ok: true, attempted: results.length, completed,
@@ -282,6 +292,7 @@ Deno.serve(async (req: Request) => {
       ? admin.storage.from(PUBLIC_BUCKET).getPublicUrl(asset.storage_path).data.publicUrl
       : null;
     const { data: cleanupJobId, error: switchError } = await admin.rpc("set_media_asset_visibility", {
+      p_actor_id: userData.user.id,
       p_asset_id: assetId,
       p_target_bucket: targetBucket,
       p_target_path: asset.storage_path,
@@ -291,7 +302,7 @@ Deno.serve(async (req: Request) => {
       // Keep the destination copy for inspection; do not risk deleting a pre-existing object.
       return json({ ok: false, message: "The database was not updated; the original remains intact. A destination copy may need orphan review: " + safeError(switchError) });
     }
-    const cleanup = cleanupJobId ? await processJob(admin, cleanupJobId) : null;
+    const cleanup = cleanupJobId ? await processJob(admin, cleanupJobId, userData.user.id) : null;
     return json({
       ok: !cleanup || cleanup.status === "completed",
       moved: true,
