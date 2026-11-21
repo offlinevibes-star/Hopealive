@@ -42,7 +42,7 @@ test("migration tool inline JavaScript parses", () => {
 });
 
 
-test("public gallery uses category-aware pagination and a photo/video slideshow", () => {
+test("public gallery uses category-aware pagination and a top-of-gallery automatic random photo slideshow", () => {
   assert.match(site, /const GALLERY_PAGE_SIZE=12/);
   assert.match(site, /data-gallery-page/);
   assert.match(site, /galleryPageNumbers/);
@@ -50,15 +50,23 @@ test("public gallery uses category-aware pagination and a photo/video slideshow"
   assert.match(site, /Showing .* photos and videos/);
   assert.match(site, /data-gallery-open/);
   assert.match(site, /class="lb-video" controls playsinline/);
-  assert.match(site, /toggleGallerySlideshow/);
-  assert.match(site, /setInterval\(/);
+  assert.match(site, /const initGalleryShowcase/);
+  assert.match(site, /Math\.random\(\)/);
+  assert.match(site, /window\.setInterval\(\(\)=>\{/);
+  assert.match(site, /\},6500\)/);
+  assert.match(site, /prefers-reduced-motion/);
+  assert.doesNotMatch(site, /Play slideshow|View slideshow|Open slideshow|toggleGallerySlideshow|lb-toggle|gal-open-label/);
   assert.match(site, /ArrowLeft/);
   assert.match(site, /ArrowRight/);
   assert.match(site, /Escape/);
   assert.match(site, /ontouchend/);
+  assert.match(galleryPage, /id="gallery-slideshow"/);
+  assert.match(galleryPage, /id="gallery-slide-image"/);
+  assert.ok(galleryPage.indexOf('id="gallery-slideshow"') < galleryPage.indexOf('id="gallery-filters"'));
   assert.match(galleryPage, /id="gallery-pagination"/);
   assert.match(galleryPage, /id="gallery-summary"/);
   assert.match(galleryPage, /id="gallery-filters"/);
+  assert.match(styles, /\.gallery-showcase/);
   assert.match(styles, /\.gallery-pagination/);
   assert.match(styles, /#lb\.gallery-viewer/);
   assert.match(styles, /prefers-reduced-motion/);
