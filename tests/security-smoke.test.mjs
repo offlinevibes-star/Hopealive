@@ -98,13 +98,32 @@ test("admin audit trail is restricted and rate-limit cleanup is service-role onl
   assert.match(mediaMigration, /to service_role/);
 });
 
-test("media operations use paginated queries and page-scoped private previews", () => {
-  assert.match(adminMedia, /select\("\*", \{ count: "exact" \}\)/);
+test("media operations use real server pagination, responsive cards and page-scoped private previews", () => {
+  assert.match(adminMedia, /count: "exact"/);
   assert.match(adminMedia, /\.range\(first, first \+ hopeMediaState\.pageSize - 1\)/);
   assert.match(adminMedia, /createSignedUrl\(asset\.storage_path, 300\)/);
   assert.match(adminMedia, /loading="lazy"/);
   assert.match(adminMedia, /preload="none"/);
+  assert.match(adminMedia, /data-hm-page/);
+  assert.match(adminMedia, /media-pagination/);
+  assert.match(adminMedia, /requestId !== hopeMediaState\.requestId/);
   assert.match(adminMedia, /queue_orphan_delete/);
+  assert.match(adminMedia, /media-stat-total/);
+});
+
+test("media name saving verifies that the database actually returned an updated record", () => {
+  assert.match(adminMedia, /\.select\("id,display_name,alt_text,caption,category,updated_at"\)\.maybeSingle\(\)/);
+  assert.match(adminMedia, /if \(!saved \|\| saved\.id !== id\)/);
+  assert.match(adminMedia, /Apply migration 004_media_metadata_audit\.sql/);
+  assert.match(adminMedia, /The original filename and file URL are unchanged/);
+});
+
+test("media library loads its dedicated responsive admin styling and cache-busted module", () => {
+  assert.match(admin, /admin-media\.css\?v=/);
+  assert.match(admin, /admin-media\.js\?v=/);
+  assert.match(adminMedia, /hm-hero/);
+  assert.match(adminMedia, /hm-toolbar/);
+  assert.match(adminMedia, /hm-grid/);
 });
 
 test("browser code cannot directly delete media Storage objects", () => {
