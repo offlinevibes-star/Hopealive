@@ -34,8 +34,30 @@ document.head.insertAdjacentHTML('beforeend','<meta name="theme-color" content="
 B.insertAdjacentHTML('afterbegin',`<svg width="0" height="0" style="position:absolute" aria-hidden="true">${['<path d="M0 100V0a100 100 0 0 1 100 100z"/>','<circle cx="50" cy="50" r="50"/>','<path d="M0 100V50a50 50 0 0 1 100 0v50z"/>','<path d="M0 100C0 45 45 0 100 0c0 55-45 100-100 100z"/>','<path d="M50 0c5 35 15 45 50 50-35 5-45 15-50 50-5-35-15-45-50-50 35-5 45-15 50-50z"/>'].map((s,i)=>`<symbol id="s${i+1}" viewBox="0 0 100 100" fill="currentColor">${s}</symbol>`).join('')}</svg><a class="skip" href="#main">Skip to content</a><header><div class="wrap"><nav aria-label="Main"><a class="logo" href="index.html"><span class="dot"></span>HopeAlive</a><button id="bg" aria-expanded="false" aria-controls="menu">Menu</button><ul id="menu">${NAV.map(([f,t])=>`<li><a href="${f}.html"${f==pg||(f=='blog'&&pg=='post')?' aria-current="page"':''}>${t}</a></li>`).join('')}<li><a class="btn" href="get-involved.html">Donate</a></li></ul></nav></div></header>`);
 B.insertAdjacentHTML('beforeend',`<footer><div class="wrap"><a class="logo" href="index.html"><span class="dot"></span>HopeAlive</a><p><b>HopeAlive Foundation for Education and Community Development</b></p><p>Incorporated Trustees, CAC IT No. 8700520</p><p>Tax ID (TIN): 33447613-0001</p><p>No 8, Umuozuo Street, Aba, Abia State, Nigeria</p><p class="fl">${NAV.concat([['get-involved','Get involved']]).map(([f,t])=>`<a href="${f}.html">${t}</a>`).join('')}</p><p>&copy; ${new Date().getFullYear()} HopeAlive Foundation. Not-for-profit and non-political.</p></div></footer><div id="lb" class="gallery-viewer" role="dialog" aria-modal="true" aria-label="Gallery viewer" aria-hidden="true"><div class="viewer-shell"><button class="x viewer-close" type="button" aria-label="Close slideshow">&times;</button><div class="viewer-stage"><button class="pv viewer-arrow" type="button" aria-label="Previous item">&lsaquo;</button><div class="viewer-media"><img class="lb-image" alt=""><video class="lb-video" controls playsinline preload="metadata" hidden></video></div><button class="nx viewer-arrow" type="button" aria-label="Next item">&rsaquo;</button></div><div class="viewer-footer"><div class="viewer-caption"><p id="lc"></p><span id="lb-count"></span></div></div></div></div>`);
 const bg=$('#bg'),menu=$('#menu'),lb=$('#lb');
-bg.onclick=()=>bg.setAttribute('aria-expanded',menu.classList.toggle('open'));
-menu.onclick=e=>{if(e.target.matches('a')){menu.classList.remove('open');bg.setAttribute('aria-expanded','false')}};
+
+// Keep the mobile navigation usable with touch, keyboard and pointer input.
+bg.addEventListener('click',()=>{
+ const open=bg.getAttribute('aria-expanded')!=='true';
+ bg.setAttribute('aria-expanded',String(open));
+ menu.classList.toggle('open',open);
+});
+menu.addEventListener('click',e=>{
+ if(e.target.closest('a')){menu.classList.remove('open');bg.setAttribute('aria-expanded','false')}
+});
+document.addEventListener('click',e=>{
+ if(bg.getAttribute('aria-expanded')==='true'&&!e.target.closest('nav')){
+  menu.classList.remove('open');bg.setAttribute('aria-expanded','false');
+ }
+});
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&bg.getAttribute('aria-expanded')==='true'){
+  menu.classList.remove('open');bg.setAttribute('aria-expanded','false');bg.focus();
+ }
+});
+const desktopNav=window.matchMedia('(min-width: 961px)');
+const syncNavViewport=()=>{if(desktopNav.matches){menu.classList.remove('open');bg.setAttribute('aria-expanded','false')}};
+if(desktopNav.addEventListener)desktopNav.addEventListener('change',syncNavViewport);else desktopNav.addListener(syncNavViewport);
+
 let gi=0,galleryItems=C.gallery.slice(),lastGalleryFocus=null,galleryScrollBefore='';
 const show=i=>{
  const n=galleryItems.length;if(!n)return;
