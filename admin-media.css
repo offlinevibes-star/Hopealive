@@ -27,7 +27,7 @@
 .hm-dropzone small{margin-top:5px;color:#7a859b;font-size:12px;font-weight:500}
 .hm-file-name{margin-top:6px;color:#43527a;font-size:12px}
 .hm-form-field{display:flex;flex-direction:column;gap:6px;margin:0;color:#5a6680;font-size:12px;font-weight:800}
-.hm-form-field input,.hm-form-field select,.hm-form-field textarea{width:100%;min-width:0;margin:0;padding:10px 12px;border:1px solid #dce3ee;border-radius:11px;background:#fff;color:#25324f;font:500 14px/1.35 inherit;box-shadow:none}
+.hm-form-field input,.hm-form-field select,.hm-form-field textarea{width:100%;min-width:0;margin:0;padding:10px 12px;border:1px solid #dce3ee;border-radius:11px;background:#fff;color:#25324f;font-family:inherit;font-size:14px;font-weight:500;line-height:1.35;box-shadow:none}
 .hm-form-field input:focus,.hm-form-field select:focus,.hm-form-field textarea:focus{outline:3px solid #e4e9ff;border-color:#7183d0}
 .hm-form-field textarea{min-height:76px;resize:vertical}
 .hm-upload-footer{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:13px}
