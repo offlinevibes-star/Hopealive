@@ -56,8 +56,8 @@ test("main site headings and page copy are editable from settings", () => {
   assert.match(settingsSource, /Main website text/);
   assert.match(settingsSource, /homeHeroTitle/);
   assert.match(settingsSource, /field\(label,'content\.'\+key/);
-  assert.match(settingsSource, /content\.contactIntro/);
-  assert.match(settingsSource, /content\.volunteerText/);
+  assert.match(settingsSource, /contactIntro/);
+  assert.match(settingsSource, /volunteerText/);
   assert.match(siteJs, /const applySiteContent/);
   assert.match(siteJs, /node\.textContent=value/);
   for (const page of publicPages) assert.match(page, /data-site-content=/);
