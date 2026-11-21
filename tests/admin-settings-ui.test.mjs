@@ -8,6 +8,8 @@ const settingsStart = adminHtml.indexOf("async function loadSettings(){");
 const settingsEnd = adminHtml.indexOf("\nasync function loadDonations()", settingsStart);
 assert.ok(settingsStart >= 0 && settingsEnd > settingsStart, "settings editor function must exist");
 const settingsSource = adminHtml.slice(settingsStart, settingsEnd);
+const siteJs = await readFile(new URL("../site.js", import.meta.url), "utf8");
+const publicPages = await Promise.all(["index.html", "about.html", "programmes.html", "team.html", "gallery.html", "contact.html", "get-involved.html"].map((name) => readFile(new URL("../" + name, import.meta.url), "utf8")));
 const inlineScripts = [...adminHtml.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)]
   .map((match) => match[1])
   .filter((source) => source.trim());
@@ -48,4 +50,14 @@ test("settings editor includes editable homepage, gallery, team and contact fiel
   }
   assert.match(settingsSource, /@media\(max-width:850px\)/);
   assert.match(settingsSource, /@media\(max-width:560px\)/);
+});
+
+test("main site headings and page copy are editable from settings", () => {
+  assert.match(settingsSource, /Main website text/);
+  assert.match(settingsSource, /content\.homeHeroTitle/);
+  assert.match(settingsSource, /content\.contactIntro/);
+  assert.match(settingsSource, /content\.volunteerText/);
+  assert.match(siteJs, /const applySiteContent/);
+  assert.match(siteJs, /node\.textContent=value/);
+  for (const page of publicPages) assert.match(page, /data-site-content=/);
 });
