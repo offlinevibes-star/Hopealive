@@ -7,6 +7,8 @@ const read = (path) => readFileSync(new URL(path, import.meta.url), "utf8");
 const site = read("../site.js");
 const client = read("../supabase-client.js");
 const admin = read("../admin.html");
+const galleryPage = read("../gallery.html");
+const styles = read("../style.css");
 const contact = read("../contact.html");
 const importer = read("../supabase-migrate.html");
 const migration = read("../supabase/migrations/003_security_reliability.sql");
@@ -37,6 +39,29 @@ test("admin inline JavaScript parses", () => {
 
 test("migration tool inline JavaScript parses", () => {
   for (const script of inlineScripts(importer)) assert.doesNotThrow(() => new vm.Script(script));
+});
+
+
+test("public gallery uses category-aware pagination and a photo/video slideshow", () => {
+  assert.match(site, /const GALLERY_PAGE_SIZE=12/);
+  assert.match(site, /data-gallery-page/);
+  assert.match(site, /galleryPageNumbers/);
+  assert.match(site, /galleryFilter/);
+  assert.match(site, /Showing .* photos and videos/);
+  assert.match(site, /data-gallery-open/);
+  assert.match(site, /class="lb-video" controls playsinline/);
+  assert.match(site, /toggleGallerySlideshow/);
+  assert.match(site, /setInterval\(/);
+  assert.match(site, /ArrowLeft/);
+  assert.match(site, /ArrowRight/);
+  assert.match(site, /Escape/);
+  assert.match(site, /ontouchend/);
+  assert.match(galleryPage, /id="gallery-pagination"/);
+  assert.match(galleryPage, /id="gallery-summary"/);
+  assert.match(galleryPage, /id="gallery-filters"/);
+  assert.match(styles, /\.gallery-pagination/);
+  assert.match(styles, /#lb\.gallery-viewer/);
+  assert.match(styles, /prefers-reduced-motion/);
 });
 
 test("public contact form submits only through the rate-limited function", () => {
