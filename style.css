@@ -80,7 +80,7 @@ nav .btn{padding:9px 20px;font-size:15px}
 .gal figure:nth-child(5n+4){--c:var(--plum)}
 .gal figure:nth-child(5n){--c:var(--sky)}
 .gal img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
-.gal figcaption{position:absolute;left:0;right:0;bottom:0;padding:12px 14px;font-weight:600;font-size:15px;pointer-events:none}
+.gal figcaption{position:absolute;left:0;right:0;bottom:0;padding:12px 14px;background:#14143ccc;color:#fff;font-weight:600;font-size:15px;pointer-events:none}
 .gal img+figcaption{background:#14143ccc;color:#fff}
 .ph{position:absolute;top:14px;right:14px;width:44px;height:44px;opacity:.25}
 .crew{display:grid;gap:36px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
