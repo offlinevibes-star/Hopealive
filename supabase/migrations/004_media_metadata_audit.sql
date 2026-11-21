@@ -59,7 +59,7 @@ returns void
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $$
 begin
   if not public.is_hopealive_admin() then
     raise exception 'Administrator access required' using errcode = '42501';
@@ -71,7 +71,7 @@ begin
   values (auth.uid(), p_action, 'auth',
     case when p_action = 'login' then 'Administrator signed in.' else 'Administrator signed out.' end);
 end;
-$;
+$$;
 revoke all on function public.record_admin_auth_event(text) from public, anon;
 grant execute on function public.record_admin_auth_event(text) to authenticated;
 

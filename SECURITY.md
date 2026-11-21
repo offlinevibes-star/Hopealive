@@ -4,7 +4,7 @@
 
 - Supabase Auth authenticates administrators.
 - `public.admin_users` is the single administrator allow-list. Do not enable public admin registration.
-- The `is_hopealive_admin()` SECURITY DEFINER function returns only a boolean and uses an empty search path.
+- The `is_hopealive_admin()` helper is `SECURITY INVOKER`; `admin_users` RLS allows authenticated users to read only their own membership row. The four authenticated SECURITY DEFINER admin RPCs retain explicit allow-list checks and use an empty search path.
 - RLS policies must remain enabled. Anonymous visitors may read public content only; administrative mutations require an allow-listed authenticated user.
 
 ## Contact submissions
@@ -25,6 +25,9 @@ Required Edge Function secrets: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TU
 - `hopealive-media` is public for deliberately published content. Public URLs are accessible to anyone who obtains them.
 - `hopealive-private-media` is private; the admin dashboard uses signed URLs for previews.
 - Storage writes are restricted to administrators by Storage RLS policies.
+- Direct browser deletion of rows from media_assets is revoked. The two HopeAlive Storage bucket DELETE policies are removed; no project-wide Storage privilege is revoked because storage.objects is shared by every bucket.
+- Media deletion and orphan cleanup require an allow-listed admin JWT at the admin-media Edge Function, followed by server-side reference checks and a private retryable cleanup job. The service-role key is used only inside the Edge Function.
+- Database triggers block new post/site-settings references to assets with pending deletion or active cleanup jobs. This serializes reference creation against cleanup for the known HopeAlive content tables.
 - Unpublished media must not be placed in the public bucket.
 
 ## Secrets and hosting headers
@@ -33,7 +36,7 @@ The static GitHub Pages host does not provide arbitrary response-header configur
 
 ## Operational checks
 
-- Review Supabase Database and Storage RLS policies after schema changes.
+- Review Supabase Database and Storage RLS policies after schema changes. After migration 005, verify both HopeAlive bucket delete policies are absent while unrelated bucket policies remain unchanged. After migration 006, verify that anonymous users see only published posts, signed-in non-admins cannot see drafts, and the admin helper can read only the caller's own allow-list row.
 - Enable leaked-password protection in Supabase Auth.
 - Keep the service-role key only in Edge Function secrets.
 - Schedule `public.cleanup_contact_rate_limits()` daily.

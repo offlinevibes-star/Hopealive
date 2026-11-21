@@ -1,115 +1,118 @@
-# HopeAlive Supabase production setup
+# HopeAlive Supabase setup and deployment
 
-The public website is hosted as a static GitHub Pages site. The browser uses only the Supabase project URL and publishable key. **Never place the database password, service-role key, or other server secrets in website files or `site_settings`.**
+The public website is a static GitHub Pages site. Browser code uses the Supabase project URL and publishable key only. **Never put a database password, service-role key, Supabase secret key or Turnstile secret in frontend files, GitHub Pages, or website settings.**
 
-## Apply the database migrations
+## Production safety
 
-Run these migrations in order in the HopeAlive Supabase project's SQL Editor:
+Treat the connected HopeAlive project as production. Take and verify an appropriate database backup and export both Storage buckets before applying schema changes. Do not run destructive tests against production. Apply changes first to a separate Supabase test project, confirm the schema and policies, deploy functions there, and run the automated and manual acceptance checks.
 
-1. `supabase/migrations/001_hopealive_cms.sql`
-2. `supabase/migrations/002_media_library.sql`
-3. `supabase/migrations/003_security_reliability.sql`
-4. `supabase/migrations/004_media_metadata_audit.sql`
+## Apply migrations in order
 
-Migration 003 is additive and preserves existing media objects. It:
-- Adds a stable source key to legacy donation imports so repeat imports upsert instead of creating duplicates.
-- Creates a private media bucket for unpublished gallery items and draft-post attachments.
-- Keeps the existing public bucket for approved/published website media and restricts future uploads to approved raster/video MIME types.
-- Adds a server-side contact rate-limit table/function and removes direct anonymous inserts into the contact table.
-- Consolidates overlapping post/settings read policies while retaining public published reads and allow-listed admin access.
-- Adds editable media display names and alt text without changing Storage object paths.
-- Adds an administrator-only activity log for administrator login/logout and changes to posts, media, settings and donations.
-- Adds a service-role-only cleanup function for expired contact rate-limit records.
+Use Supabase CLI in a trusted workstation or the Supabase SQL Editor, reviewing the SQL and current migration history first:
 
-Do not skip migrations or run 003 before 002. Take a database backup before applying schema changes.
+1. supabase/migrations/001_hopealive_cms.sql
+2. supabase/migrations/002_media_library.sql
+3. supabase/migrations/003_security_reliability.sql
+4. supabase/migrations/004_media_metadata_audit.sql
+5. supabase/migrations/005_media_operations_and_contact_limits.sql
+6. supabase/migrations/006_policy_and_index_cleanup.sql
+7. supabase/migrations/007_atomic_media_cleanup_claim.sql
+8. supabase/migrations/008_atomic_media_reference_lock.sql
+9. supabase/migrations/009_internal_media_rpc_and_audit_hardening.sql
+
+Migration 004's administrator auth-event function uses corrected PostgreSQL dollar-quoting in this branch. Migration 005 is additive and:
+- Adds media display-name, alt-text and pending-deletion metadata where absent, and creates media search/pagination indexes.
+- Creates a private cleanup queue with retry status, attempt count and error details.
+- Restricts direct browser deletion of media metadata; destructive cleanup is performed by the server-side media function.
+- Adds administrator-only media integrity reporting, reference-aware delete requests and orphan cleanup requests.
+- Replaces the posts read policy that used deprecated auth.role() with separate anonymous-published and authenticated-published/admin policies.
+- Adds global, email and optional trusted-IP rate-limit keys using a service-role-only function.
+
+Migration 007 adds an atomic, service-role-only cleanup-job claim. It prevents two concurrent admin requests from processing the same job and permits a stuck running job to be reclaimed only after the retry timeout.
+
+Migration 008 closes the race between a new post/site-setting reference and a cleanup/visibility request. Content writes take a shared transaction-scoped advisory lock; media cleanup and visibility RPCs take the matching exclusive lock before checking references and committing the cleanup job or metadata switch. The visibility RPC also rejects an asset already marked pending deletion.
+
+Migration 009 removes browser-role EXECUTE grants from the privileged media RPCs. The authenticated admin-media Edge Function verifies the user's identity and allow-list membership, then calls service-role-only RPCs using that verified actor UUID. Cleanup metadata finalization and visibility changes preserve the actor for the audit trigger. The admin login/logout event RPC now runs as SECURITY INVOKER with an RLS insert policy restricted to the signed-in administrator's own login/logout rows.
+
+Migration 006 makes is_hopealive_admin() a SECURITY INVOKER helper backed by an RLS policy that lets an authenticated user read only their own admin allow-list row. It adds explicit deny policies for internal rate-limit/cleanup tables, consolidates post SELECT policies by role, and indexes the audit/cleanup foreign keys.
+
+Do not re-run older migrations blindly. Confirm which versions have already been applied and inspect any SQL Editor-only changes before selecting the next migration. Take a backup before DDL changes.
 
 ## Administrator access
 
-1. In Supabase Authentication → Users, invite each administrator.
-2. Add each invited user's exact Auth UUID to `public.admin_users`.
+1. Invite administrators in Supabase Authentication → Users.
+2. Add each invited user's exact Auth UUID to public.admin_users.
 3. Do not enable public administrator sign-ups.
-4. In Authentication settings, enable **Leaked password protection** (Have I Been Pwned checks) and set a suitable minimum password length.
-5. Restrict allowed redirect URLs to the production site, including:
-   `https://offlinevibes-star.github.io/Hopealive/**`
-6. Test sign-in, password recovery, sign-out, and removal from the admin allow-list.
+4. Enable **Leaked password protection** in Authentication password/security settings. The connected project advisor reported this was disabled during the review; it is a manual dashboard setting.
+5. Restrict Auth redirect URLs to the production site, including https://offlinevibes-star.github.io/Hopealive/**.
+6. Test an allow-listed admin, a signed-in non-admin and an anonymous visitor in the isolated environment.
 
-The database advisor may report `admin_users` as RLS-enabled without policies. That is intentional: browser roles must not enumerate the allow-list. The `is_hopealive_admin()` SECURITY DEFINER RPC is intentionally executable by authenticated users so the dashboard can check its own authorization; it returns only a boolean.
+The allow-list has RLS enabled. An authenticated user can read only their own membership row; the function is_hopealive_admin() uses invoker rights and returns only whether the current signed-in user is allow-listed. Do not grant browser roles insert, update or delete access to the allow-list.
 
-## Expose the Data API schema
+## Deploy Edge Functions
 
-In Project Settings → API (or the project's Data API settings), confirm that `public` is included in the exposed schemas. The site calls the Supabase Data API for `posts`, `site_settings`, `media_assets`, and admin-only tables. SQL grants and RLS policies alone do not expose a schema through PostgREST.
+After migrations 001–009 are applied in the target environment:
 
-Keep RLS enabled and test both anonymous and administrator access after changing exposure settings.
-
-## Deploy the contact Edge Function
-
-The public contact form now calls `contact-submit`; it no longer inserts directly into `contact_messages`.
-
-From the repository root, after migrations 003 and 004 have been applied:
-
-```sh
+~~~sh
 supabase functions deploy contact-submit --no-verify-jwt
-```
+supabase functions deploy admin-media
+~~~
 
-This endpoint intentionally does not require a Supabase user JWT because visitors are anonymous. The function validates the actual streamed request body (12 KB maximum), applies five-per-15-minute email-hash limits, and optionally adds IP-hash limits only when a trusted Cloudflare proxy is explicitly configured. It uses a honeypot and inserts through the server-side service role. The service-role key must remain in Supabase's function environment only.
+- contact-submit intentionally allows anonymous visitors and performs validation, Turnstile verification and rate limiting itself; it must have platform JWT verification disabled.
+- admin-media requires an authenticated user JWT and performs its own auth.getUser() and is_hopealive_admin() checks before any service-role operation. Keep platform JWT verification enabled (the default).
 
-The function allows the GitHub Pages origin `https://offlinevibes-star.github.io`. If the site uses a custom domain, update the function's CORS/origin allow-list before deployment.
+The functions use the standard Supabase Edge Function environment variables for project URL, anon key and service-role key. Do not copy secrets into the repo or website.
 
-### Turnstile (required in production)
+## Contact form secrets and controls
 
-The function supports Cloudflare Turnstile when configured:
+Set a strong random RATE_LIMIT_SALT and a Cloudflare Turnstile secret in Supabase Edge Function secrets:
 
-1. Create a Turnstile widget for the production site hostname in Cloudflare.
-2. Put the **site key** in the public website settings JSON as `"turnstileSiteKey": "YOUR_SITE_KEY"`.
-3. Store the **secret key** as a Supabase Edge Function secret, never in the website:
-   ```sh
-   supabase secrets set TURNSTILE_SECRET_KEY=YOUR_SECRET_KEY
-   ```
-4. Set a strong random `RATE_LIMIT_SALT` as an Edge Function secret. It is required to hash email/IP identifiers:
-   `supabase secrets set RATE_LIMIT_SALT=YOUR_RANDOM_SECRET`
-5. Optionally set `CONTACT_ALLOWED_ORIGIN` for a custom website origin and `TURNSTILE_ALLOWED_HOSTNAMES` to a comma-separated hostname allow-list.
-6. Redeploy `contact-submit` and test valid, missing, invalid and expired challenges.
+~~~sh
+supabase secrets set RATE_LIMIT_SALT=YOUR_RANDOM_SECRET
+supabase secrets set TURNSTILE_SECRET_KEY=YOUR_TURNSTILE_SECRET
+supabase secrets set TURNSTILE_ALLOWED_HOSTNAMES=offlinevibes-star.github.io
+~~~
 
-Production fails closed when `TURNSTILE_SECRET_KEY` is absent. The only bypass is an explicitly configured local environment with `APP_ENV=development`; never set that value in production. The public site key belongs in the public `turnstileSiteKey` setting; the secret never belongs in frontend code.
+The public Turnstile site key belongs in the public site_settings.settings.turnstileSiteKey field; the secret key must remain a function secret. Production fails closed when the Turnstile secret is absent. Only an isolated local test may set APP_ENV=development to bypass Turnstile.
 
-## Media privacy and consent
+The contact function enforces a fixed 15-minute global cap (300 requests) before CAPTCHA verification, then applies a per-normalized-email cap (5) and an optional per-IP cap (5) only after Turnstile succeeds. This ordering prevents invalid CAPTCHA attempts from consuming a victim's email quota. Identifiers are salted SHA-256 hashes; raw sender emails and IP addresses are not stored in the rate-limit table. Limiter database failures fail closed.
 
-- The `hopealive-media` bucket remains public for media intentionally published on the public website.
-- The new `hopealive-private-media` bucket is private. New unpublished Gallery media and draft-post attachments go there and are shown to administrators through short-lived signed URLs.
-- Publishing copies the asset to the public bucket; unpublishing moves it back to private storage.
-- Existing published assets are not moved by migration 003. The current project had 94 media rows, all marked published, and 94 objects in the public bucket at the time of review.
-- If older draft posts already have attachments in the public bucket, edit and save each draft once to move those attachments to private storage.
-- Obtain and retain appropriate consent before publishing identifiable people, especially children. A public object URL is accessible to anyone who has it.
+### Trusted IP rate limiting
 
-## Donation import
+The per-IP layer is intentionally disabled unless TRUST_CF_CONNECTING_IP=true is explicitly set. It reads only cf-connecting-ip; it does not parse client-supplied x-forwarded-for or x-real-ip values. The mere presence of a header is not proof that it was sanitized by the ingress.
 
-Run the legacy import from the admin dashboard only after migration 003. Posts and settings are upserted. Donations now receive deterministic `source_key` values and are upserted by that key, so rerunning the same import will not duplicate those imported rows. Manually entered donations are not overwritten.
+Before enabling the flag, verify the actual deployed function route and proxy behavior for this project. Use a temporary diagnostic endpoint in the isolated environment to compare the received cf-connecting-ip with a caller-supplied forged value, confirm that the upstream proxy overwrites it, and remove the diagnostic endpoint afterwards. If that guarantee cannot be verified for the route being used, leave the flag unset; global and email controls still operate. Do not enable IP enforcement on a custom domain or alternate route without repeating this check.
 
-If an earlier version of the importer was run before source keys existed, reconcile any old imported donation rows manually before re-importing them; the new key cannot automatically identify historical duplicates.
+A custom website origin also requires updating CONTACT_ALLOWED_ORIGIN and TURNSTILE_ALLOWED_HOSTNAMES before deploying the contact function.
 
-## Public website settings
+## Media buckets and privacy
 
-Every value in `site_settings.settings` is public. Only store verified public contact details, approved images, public social links, donation instructions, and other content intended for visitors. Never store private staff details, passwords, payment-provider secrets, service-role keys, or other credentials there. The admin editor now validates the top-level settings keys and displays this warning.
+- hopealive-media is public for explicitly approved/published assets.
+- hopealive-private-media is private for unpublished Gallery assets and draft attachments.
+- Existing public objects are not automatically moved by migrations.
+- Obtain appropriate documented consent before publishing identifiable people, especially children and other vulnerable people.
+- Do not use public Storage URLs for unpublished content.
 
-Published post HTML is sanitized with DOMPurify before it is rendered. If the sanitizer CDN cannot load, the post body is rendered as escaped text rather than trusted raw HTML.
+## Rate-limit cleanup
 
-## Backups, tests, and rollout
+Migration 004/005 grants public.cleanup_contact_rate_limits() only to service_role. Schedule it daily through Supabase Cron or another trusted scheduler:
 
-1. Enable the strongest database backup/PITR option available for the Supabase plan and periodically test a restore.
-2. Merge the GitHub pull request only after the GitHub Actions static smoke tests pass.
-3. Apply migrations 003 and 004 and deploy the Edge Function before publishing the new frontend. This order prevents the new contact form from calling an undeployed function.
-4. Configure Turnstile and leaked-password protection before public launch.
-5. Test on desktop and mobile:
-   - Public pages and published posts load; drafts stay hidden.
-   - Draft media previews work only for signed-in admins.
-   - Publishing/unpublishing media copies between buckets and updates metadata.
-   - Contact form success, validation, honeypot, rate-limit (sixth request), and Turnstile.
-   - Donation import can be run twice without increasing imported donation count.
-   - Admin CRUD, session expiry, password recovery, and unauthorized accounts.
-6. Review Supabase security/performance advisors after migration and monitor Edge Function/Postgres logs.
+~~~sql
+select public.cleanup_contact_rate_limits();
+~~~
 
-The GitHub Actions tests are static syntax/security smoke checks; they do not replace browser, end-to-end, permission, or restore testing.
+Scheduling is a manual operations step and is not activated by the migrations.
 
-### Rate-limit cleanup
+## Rollout sequence
 
-Migration 004 creates `public.cleanup_contact_rate_limits()`, which deletes hashed identifiers not updated for 24 hours. Schedule it daily using Supabase Cron (or another trusted scheduler) with `select public.cleanup_contact_rate_limits();`. Scheduling is a dashboard/operations step and is not activated by the migration itself.
+1. Back up database and both Storage buckets.
+2. Apply migrations to a test project.
+3. Deploy both Edge Functions to the test project.
+4. Configure Turnstile secrets and run contact-form tests, including the invalid-token path and rate-limit thresholds.
+5. Run admin media pagination, metadata edits, visibility move, delete-in-use rejection, orphan scan, failure/retry and RLS tests in the test project.
+6. Confirm the admin dashboard still loads posts, messages, settings, donations and activity logs.
+7. Apply the reviewed migration sequence and deploy function versions to production during an approved rollout window.
+8. Only then publish the frontend branch to GitHub Pages.
+9. Review security and performance advisors and monitor function/Postgres logs.
+
+Do not state a backup is verified until a restoration has actually been completed and recorded.
