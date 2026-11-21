@@ -122,33 +122,17 @@ Deno.serve(async (req: Request) => {
   const globalHash = await sha256("global:contact:" + salt);
   const emailHash = await sha256("email:" + normalized.email + ":" + salt);
 
-  // Global + per-email controls always apply. IP limits are added only when the
-  // platform's client-IP header has been explicitly configured and validated.
-  for (const [keyHash, limit, label] of [
-    [globalHash, 300, "global_limit"],
-    [emailHash, 5, "email_limit"],
-  ] as const) {
-    const result = await consumeLimit(service, keyHash, limit);
-    if (result.failed) {
-      console.error("Contact rate limiter unavailable.");
-      return json({ error: "Message service is temporarily unavailable." }, 503);
-    }
-    if (!result.allowed) {
-      suspicious(label, req);
-      return json({ error: "Too many messages. Please try again later." }, 429);
-    }
+  // The global cap protects verification/persistence services from bulk abuse.
+  // Per-email/IP quotas are consumed only after a successful challenge so a caller
+  // cannot lock another sender out by submitting invalid or missing CAPTCHA tokens.
+  const globalResult = await consumeLimit(service, globalHash, 300);
+  if (globalResult.failed) {
+    console.error("Contact rate limiter unavailable.");
+    return json({ error: "Message service is temporarily unavailable." }, 503);
   }
-  if (clientIp) {
-    const ipHash = await sha256("ip:" + clientIp + ":" + salt);
-    const result = await consumeLimit(service, ipHash, 5);
-    if (result.failed) {
-      console.error("Contact IP rate limiter unavailable.");
-      return json({ error: "Message service is temporarily unavailable." }, 503);
-    }
-    if (!result.allowed) {
-      suspicious("ip_limit", req);
-      return json({ error: "Too many messages. Please wait before trying again." }, 429);
-    }
+  if (!globalResult.allowed) {
+    suspicious("global_limit", req);
+    return json({ error: "Too many messages. Please try again later." }, 429);
   }
 
   if (turnstileSecret) {
@@ -180,6 +164,29 @@ Deno.serve(async (req: Request) => {
     } catch {
       console.error("Turnstile verification request failed.");
       return json({ error: "Verification service is unavailable." }, 503);
+    }
+  }
+
+  const emailResult = await consumeLimit(service, emailHash, 5);
+  if (emailResult.failed) {
+    console.error("Contact email rate limiter unavailable.");
+    return json({ error: "Message service is temporarily unavailable." }, 503);
+  }
+  if (!emailResult.allowed) {
+    suspicious("email_limit", req);
+    return json({ error: "Too many messages. Please try again later." }, 429);
+  }
+
+  if (clientIp) {
+    const ipHash = await sha256("ip:" + clientIp + ":" + salt);
+    const ipResult = await consumeLimit(service, ipHash, 5);
+    if (ipResult.failed) {
+      console.error("Contact IP rate limiter unavailable.");
+      return json({ error: "Message service is temporarily unavailable." }, 503);
+    }
+    if (!ipResult.allowed) {
+      suspicious("ip_limit", req);
+      return json({ error: "Too many messages. Please wait before trying again." }, 429);
     }
   }
 
