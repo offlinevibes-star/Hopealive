@@ -75,7 +75,7 @@ supabase secrets set TURNSTILE_ALLOWED_HOSTNAMES=offlinevibes-star.github.io
 
 The public Turnstile site key belongs in the public site_settings.settings.turnstileSiteKey field; the secret key must remain a function secret. Production fails closed when the Turnstile secret is absent. Only an isolated local test may set APP_ENV=development to bypass Turnstile.
 
-The contact function enforces a fixed 15-minute global cap (300 requests), per-normalized-email cap (5), and an optional per-IP cap (5). Identifiers are salted SHA-256 hashes; raw sender emails and IP addresses are not stored in the rate-limit table. Limiter database failures fail closed.
+The contact function enforces a fixed 15-minute global cap (300 requests) before CAPTCHA verification, then applies a per-normalized-email cap (5) and an optional per-IP cap (5) only after Turnstile succeeds. This ordering prevents invalid CAPTCHA attempts from consuming a victim's email quota. Identifiers are salted SHA-256 hashes; raw sender emails and IP addresses are not stored in the rate-limit table. Limiter database failures fail closed.
 
 ### Trusted IP rate limiting
 
