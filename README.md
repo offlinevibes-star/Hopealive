@@ -17,7 +17,7 @@ Open /admin.html and sign in using an invited Supabase Auth user whose UUID is i
 - Media library: upload images/videos, edit display names, alt text, captions and categories, and control Gallery publication.
 - Media browsing is paginated (24 records per page) with server-side display-name search, image/video and public/private filters, plus date/name sorting.
 - Media integrity scan reports unregistered objects, referenced-but-unregistered objects and broken media metadata. Deletion is confirmed, reference-checked and queued for retry on partial failure.
-- Settings: edit public website settings.
+- Settings: use a visual, no-code editor to change public contact/social details, donation information, homepage images, impact figures, gallery items, trustees/team profiles and editable page headings/intros across the main website. Repeatable content sections have Add/Remove controls, URL checks and previews; save to update the public site. The previous raw JSON editor is removed.
 - Messages and donations: manage the relevant records.
 - Activity log: review administrator activity records.
 
