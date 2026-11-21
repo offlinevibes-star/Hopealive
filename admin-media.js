@@ -381,7 +381,6 @@ async function loadMedia() {
       : "No files selected";
   };
   fileInput.onchange = showSelection;
-  dropzone.onclick = (event) => { if (event.target !== fileInput) fileInput.click(); };
   dropzone.ondragover = (event) => { event.preventDefault(); dropzone.classList.add("dragging"); };
   dropzone.ondragleave = () => dropzone.classList.remove("dragging");
   dropzone.ondrop = (event) => {
