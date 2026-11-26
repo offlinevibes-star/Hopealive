@@ -193,7 +193,7 @@ initGalleryShowcase();
 const K=C.bank;
 set('#bank',(C.donateLink?`<p><a class="btn" href="${C.donateLink}" target="_blank" rel="noopener">Donate online</a></p>`:'')+(K.number?`<dl><dt>Bank</dt><dd>${K.bank}</dd><dt>Account name</dt><dd>${K.name}</dd><dt>Account number</dt><dd><b>${K.number}</b><button class="cp" data-c="${K.number}">Copy</button></dd></dl>`:C.donateLink?'':'<p>Email us and we’ll share our official account details.</p>'));
 const hd=$('.dice');
-if(hd&&C.hero)hd.outerHTML=`<div class="arch"><img src="${IMG(C.hero)}" alt="HopeAlive Foundation programme"><svg aria-hidden="true" class="a1"><use href="#s2"/></svg><svg aria-hidden="true" class="a2"><use href="#s1"/></svg></div>`;
+if(hd&&C.hero)hd.outerHTML=`<div class="arch"><img src="${IMG(C.hero)}" alt="HopeAlive Foundation programme"></div>`;
 set('#stats',C.stats.map(s=>`<div><b>${s.n}</b>${s.l}</div>`).join(''));
 set('#strip',galleryItems.map((x,i)=>({x,i})).filter(v=>v.x.type!=='video').slice(0,4).map(v=>'<img data-i="'+v.i+'" src="'+escMedia(IMG(v.x.src))+'" alt="'+escMedia(v.x.cap||'HopeAlive programme photo')+'" loading="lazy">').join(''));
 [['#impact',C.stats],['#moments',galleryItems]].forEach(([q,a])=>{const e=$(q);if(e)e.hidden=!a.length});
