@@ -1,48 +1,48 @@
 {
- "email": "myhopealivenetwork@gmail.com",
- "phone": "",
- "whatsapp": "",
- "social": {
-  "Facebook": "",
-  "Instagram": "",
-  "X": "",
-  "LinkedIn": "",
-  "YouTube": ""
- },
- "bank": {
-  "bank": "",
-  "name": "HopeAlive Foundation for Education and Community Development",
-  "number": ""
- },
- "donateLink": "",
- "formspree": "",
- "hero": "",
- "giscus": {
-  "repo": "",
-  "repoId": "",
-  "category": "",
-  "categoryId": ""
- },
- "stats": [],
- "gallery": [],
- "team": [
-  {
-   "n": "Hope Kalu",
-   "r": "Chairman, Board of Trustees",
-   "p": "",
-   "b": ""
+  "email": "myhopealivenetwork@gmail.com",
+  "phone": "",
+  "whatsapp": "",
+  "social": {
+    "Facebook": "",
+    "Instagram": "",
+    "X": "",
+    "LinkedIn": "",
+    "YouTube": ""
   },
-  {
-   "n": "Lazarus Kalu",
-   "r": "Trustee",
-   "p": "",
-   "b": ""
+  "bank": {
+    "bank": "",
+    "name": "HopeAlive Foundation for Education and Community Development",
+    "number": ""
   },
-  {
-   "n": "Uchechukwu Chikezie",
-   "r": "Trustee and Secretary",
-   "p": "",
-   "b": ""
-  }
- ]
+  "donateLink": "",
+  "formspree": "",
+  "hero": "hopealive-home-team.jpg",
+  "giscus": {
+    "repo": "",
+    "repoId": "",
+    "category": "",
+    "categoryId": ""
+  },
+  "stats": [],
+  "gallery": [],
+  "team": [
+    {
+      "n": "Hope Kalu",
+      "r": "Chairman, Board of Trustees",
+      "p": "",
+      "b": ""
+    },
+    {
+      "n": "Lazarus Kalu",
+      "r": "Trustee",
+      "p": "",
+      "b": ""
+    },
+    {
+      "n": "Uchechukwu Chikezie",
+      "r": "Trustee and Secretary",
+      "p": "",
+      "b": ""
+    }
+  ]
 }
