@@ -23,5 +23,7 @@ jobs:
         run: git diff --check
       - name: Check public site JavaScript syntax
         run: node --check site.js
-      - name: Run security, media and validation tests
-        run: node --test tests/*.test.mjs
+      - name: Run admin settings UI regression test
+        run: node --test tests/admin-settings-ui.test.mjs
+      - name: Run full test suite
+        run: npm test
